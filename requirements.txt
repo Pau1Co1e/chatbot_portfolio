@@ -1,0 +1,6 @@
+fastapi~=0.115.0
+pydantic~=2.9.2
+torch==2.4.0
+transformers==4.43.3
+Flask==3.0.3
+memory_profiler==0.61.0
