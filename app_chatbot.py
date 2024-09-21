@@ -3,7 +3,9 @@ from pydantic import BaseModel, Field
 import re
 import torch
 from transformers import pipeline
+import os
 
+port = os.getenv("PORT", 8000)
 # Initialize FastAPI app
 app = FastAPI()
 

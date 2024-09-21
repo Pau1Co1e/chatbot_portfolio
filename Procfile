@@ -1,1 +1,1 @@
-web: gunicorn --workers=2 --worker-class=gevent --max-requests=100 -b 0.0.0.0:$PORT app_chatbot:app
+web: uvicorn app_chatbot:app --host 0.0.0.0 --port $PORT --workers 2 --limit-max-requests 100
