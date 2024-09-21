@@ -4,3 +4,4 @@ torch==2.4.0
 transformers==4.43.3
 Flask==3.0.3
 memory_profiler==0.61.0
+uvicorn==0.30.6
