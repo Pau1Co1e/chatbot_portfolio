@@ -1,5 +1,4 @@
 # Virtual Enviornment
-.venv/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -10,4 +9,9 @@ __pycache__/
 *.iml
 out
 gen
-!/.venv/
+
+/.venv/
+.venv
+/.venv
+misc.xml
+.idea/misc.xml

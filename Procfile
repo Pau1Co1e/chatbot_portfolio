@@ -1,1 +1,1 @@
-web: uvicorn app_chatbot:app --host 0.0.0.0 --port $PORT --workers 2 --limit-max-requests 100
+web: gunicorn -k uvicorn.workers.UvicornWorker app_chatbot:app --workers 2 --bind 0.0.0.0:$PORT
