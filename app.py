@@ -6,9 +6,10 @@ import torch
 from transformers import pipeline
 import os
 import re
+import asyncio
 
 # Environment Variables
-PORT = os.getenv("PORT", 5000)
+PORT = int(os.getenv("PORT", 5000))
 FLASK_APP_ORIGIN = "https://codebloodedfamily.com"  # Flask app's origin
 
 # Initialize FastAPI app
@@ -19,25 +20,42 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[FLASK_APP_ORIGIN],  # Allow requests from Flask app's origin
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["POST"],  # Only allow POST if that's the only endpoint
     allow_headers=["*"],
 )
 
 # Logging Configuration for Production
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger("faq_pipeline")
 
-# Load the Model
-try:
-    faq_pipeline = pipeline(
-        "question-answering",
-        model="distilbert-base-cased-distilled-squad",
-        device=0 if torch.cuda.is_available() else -1
-    )
-    logger.info(f"Model loaded on {'GPU' if torch.cuda.is_available() else 'CPU'}")
-except Exception as e:
-    logger.error(f"Failed to load the model: {e}")
-    raise
+# Load the Model at Startup
+class ModelManager:
+    def __init__(self):
+        self.lock = asyncio.Lock()
+        self.pipeline = None
+
+    async def load_model(self):
+        async with self.lock:
+            if self.pipeline is None:
+                try:
+                    self.pipeline = pipeline(
+                        "question-answering",
+                        model="distilbert-base-cased-distilled-squad",
+                        device=0 if torch.cuda.is_available() else -1
+                    )
+                    logger.info(f"Model loaded on {'GPU' if torch.cuda.is_available() else 'CPU'}")
+                except Exception as e:
+                    logger.error(f"Failed to load the model: {e}")
+                    raise
+
+model_manager = ModelManager()
+
+@app.on_event("startup")
+async def startup_event():
+    await model_manager.load_model()
 
 # Pydantic Model for FAQ Request
 class FAQRequest(BaseModel):
@@ -66,7 +84,7 @@ async def call_faq_pipeline(faq_request: FAQRequest):
         logger.info({
             'action': 'faq_pipeline_called',
             'question': sanitized_question,
-            'context_snippet': sanitized_context[:50] + '...' if len(sanitized_context) > 50 else sanitized_context
+            'context_snippet': (sanitized_context[:50] + '...') if len(sanitized_context) > 50 else sanitized_context
         })
 
         # Prepare inputs for the model
@@ -75,9 +93,13 @@ async def call_faq_pipeline(faq_request: FAQRequest):
             "context": sanitized_context
         }
 
-        # Perform model inference
-        with torch.no_grad():
-            result = faq_pipeline(inputs)
+        # Perform model inference with proper error handling
+        if model_manager.pipeline is None:
+            await model_manager.load_model()
+
+        # Use asyncio to run the blocking inference in a separate thread
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, model_manager.pipeline, inputs)
 
         # Validate the model's response
         if "answer" not in result:
