@@ -9,8 +9,8 @@ import re
 import asyncio
 
 # Environment Variables
-PORT = int(os.getenv("PORT", 5000))
-FLASK_APP_ORIGIN = "https://codebloodedfamily.com"  # Flask app's origin
+PORT = int(os.getenv("PORT", 8000))  # Updated default port to 8000
+FLASK_APP_ORIGIN = os.getenv("FLASK_APP_ORIGIN", "https://codebloodedfamily.com")  # Made configurable
 
 # Initialize FastAPI app
 app = FastAPI()
