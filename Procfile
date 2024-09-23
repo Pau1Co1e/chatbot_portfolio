@@ -1,1 +1,1 @@
-web: gunicorn -k uvicorn.workers.UvicornWorker app_chatbot:app --workers 2 --bind 0.0.0.0:$PORT
+web: gunicorn -k uvicorn.workers.UvicornWorker app:app --bind 0.0.0.0:$PORT
