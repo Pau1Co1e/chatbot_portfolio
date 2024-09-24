@@ -9,18 +9,23 @@ from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
+
 def test_faq_endpoint():
     response = client.post("/faq/", json={"question": "What is your name?", "context": "I am testing the chatbot."})
     assert response.status_code == 200
     data = response.json()
     assert "answer" in data
     assert isinstance(data["answer"], str)
+    assert len(data["answer"]) > 0  # Ensure the answer is not empty
+    print(f"FAQ Answer: {data['answer']}")
+
 
 def test_healthcheck():
     response = client.get("/")
     assert response.status_code == 200
     data = response.json()
     assert data == {"status": "healthy"}
+    print(f"Health Check Status: {data}")
 
 
 def test_faq_invalid_input():
@@ -29,6 +34,7 @@ def test_faq_invalid_input():
     data = response.json()
     assert "detail" in data
     assert data["detail"] == "`question` cannot be empty."
+    print(f"Invalid Input Response: {data}")
 
 
 def test_faq_long_input():
@@ -38,6 +44,8 @@ def test_faq_long_input():
     data = response.json()
     assert "detail" in data
     assert any(item["msg"] == "ensure this value has at most 1000 characters" for item in data["detail"])
+    print(f"Long Input Error: {data}")
+
 
 def test_faq_output_format():
     response = client.post("/faq/", json={"question": "What is your name?", "context": "Testing context."})
@@ -46,3 +54,4 @@ def test_faq_output_format():
     assert "answer" in data
     assert isinstance(data["answer"], str)
     assert len(data["answer"]) > 0  # Ensure the answer is not empty
+    print(f"Output Format Answer: {data['answer']}")
