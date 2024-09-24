@@ -52,13 +52,10 @@ jobs:
 
       - name: Deploy to Render
         run: |
-          # Trigger deployment using Render API key
-          curl -X POST "https://api.render.com/deploy/srv-crnd58o8fa8c738ds150?key=CFb87aKP0MA"
-
-
-#          curl -X POST -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
-#          -d '{"serviceId": "srv-crnd58o8fa8c738ds150"}' \
-#          https://api.render.com/v1/services/srv-crnd58o8fa8c738ds150/deploys
-
-#        env:
-#          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}  # Load the Render API key from GitHub secrets
+          curl -X POST -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+          -d '{"serviceId": "srv-crnd58o8fa8c738ds150"}' \
+          https://api.render.com/v1/services/srv-crnd58o8fa8c738ds150/deploys
+#          # Trigger deployment using Render API key
+#          curl -X POST "https://api.render.com/deploy/srv-crnd58o8fa8c738ds150?key=CFb87aKP0MA"
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}  # Load the Render API key from GitHub secrets
