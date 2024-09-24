@@ -1,3 +1,4 @@
+# .github/workflows/ci.yml
 name: CI Pipeline
 
 on:
@@ -9,52 +10,52 @@ on:
       - main
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3  # Updated version from v2 to v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Set up Node.js  # Only needed if Node.js-related dependencies exist (e.g., frontend)
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20.x'
-
-      - name: Run tests
-        run: pytest
-
-  deploy:
-    if: github.ref == 'refs/heads/main'
-    needs: build  # Deploy only if the build succeeds
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
+      - name: Check out code
+        uses: actions/checkout@v2
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      - name: Install Python dependencies for deployment
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest  # Ensure pytest is installed
+
+      - name: Run tests
+        run: pytest  # Run pytest to execute tests
+
+  deploy:
+    if: github.ref == 'refs/heads/main'  # Only deploy on main branch
+    needs: test  # Ensure tests pass before deployment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Deploy to Render
         run: |
-          # Trigger deployment (Render API key required)
           curl -X POST -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
           -d '{"serviceId": "srv-crnd58o8fa8c738ds150"}' \
           https://api.render.com/v1/services/srv-crnd58o8fa8c738ds150/deploys
-
+#          # Trigger deployment using Render API key
+#          curl -X POST "https://api.render.com/deploy/srv-crnd58o8fa8c738ds150?key=CFb87aKP0MA"
         env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}  # Load the Render API key from GitHub secrets
