@@ -54,4 +54,3 @@ vine==5.1.0
 wcwidth==0.2.13
 pytest>=6.0
 httpx>=0.23
-

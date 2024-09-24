@@ -13,7 +13,6 @@ from redis.asyncio.client import Redis
 from fastapi_cache.decorator import cache
 from pydantic import ValidationError
 import platform
-# from memory_profiler import profile
 
 # Check the system architecture and set the appropriate quantization engine
 if platform.machine() == "x86_64":  # For x86 architecture
@@ -100,10 +99,8 @@ def sanitize_text(text: str, max_length: int = 1000) -> str:
     return sanitized
 
 
-# Apply memory profiling to this function
-# @profile
 @app.post("/faq/")
-@cache(expire=60*5)
+@cache(expire=60 * 5)
 async def call_faq_pipeline(faq_request: FAQRequest):
     try:
         # Sanitize inputs
