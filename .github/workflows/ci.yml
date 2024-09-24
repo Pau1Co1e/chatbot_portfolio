@@ -9,51 +9,51 @@ on:
       - main
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Check out code
-      uses: actions/checkout@v3  # Updated to v3
+      - uses: actions/checkout@v3   # Updated version from v2 to v3
+      - uses: actions/setup-python@v4  # Ensure you're using v4 (not v3 or older)
+        with:
+          python-version: '3.10'
 
-    - name: Set up Python
-      uses: actions/setup-python@v4  # Already uses v4, but node20 will be forced soon
-      with:
-        python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.x'
 
-    - name: Run tests
-      run: |
-        pytest
+      - name: Run tests
+        run: |
+          pytest
 
   deploy:
     if: github.ref == 'refs/heads/main'
-    needs: test
+    needs: build   # Ensure the deploy job runs after build completes successfully
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3  # Updated to v3
+      - uses: actions/checkout@v3  # Updated to v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4  # Already uses v4, but node20 will be forced soon
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-    - name: Deploy to Render
-      run: |
-        # Trigger deployment (you need the Render API key for this)
-        curl -X POST -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
-        -d '{"serviceId": "srv-crnd58o8fa8c738ds150"}' \
-        https://api.render.com/v1/services/srv-crnd58o8fa8c738ds150/deploys
+      - name: Deploy to Render
+        run: |
+          # Trigger deployment (you need the Render API key for this)
+          curl -X POST -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+          -d '{"serviceId": "srv-crnd58o8fa8c738ds150"}' \
+          https://api.render.com/v1/services/srv-crnd58o8fa8c738ds150/deploys
 
-      env:
-        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
