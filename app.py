@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import torch
-from transformers import AlbertTokenizer, AlbertForQuestionAnswering
+from transformers import DistilBertTokenizer, DistilBertForQuestionAnswering
 import os
 import re
 import asyncio
@@ -13,6 +13,7 @@ from redis.asyncio.client import Redis
 from fastapi_cache.decorator import cache
 from pydantic import ValidationError
 import platform
+# from memory_profiler import profile
 
 # Check the system architecture and set the appropriate quantization engine
 if platform.machine() == "x86_64":  # For x86 architecture
@@ -57,15 +58,15 @@ class ModelManager:
         async with self.lock:
             if self.model is None or self.tokenizer is None:
                 try:
-                    # Load tokenizer and model
-                    self.tokenizer = AlbertTokenizer.from_pretrained('twmkn9/albert-base-v2-squad2')
-                    self.model = AlbertForQuestionAnswering.from_pretrained('twmkn9/albert-base-v2-squad2')
+                    # Load the correct tokenizer and model
+                    self.tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-cased-distilled-squad')
+                    self.model = DistilBertForQuestionAnswering.from_pretrained('distilbert-base-cased-distilled-squad')
 
                     # Apply dynamic quantization (architecture-agnostic)
                     self.model = torch.quantization.quantize_dynamic(
                         self.model, {torch.nn.Linear}, dtype=torch.qint8
                     )
-                    logger.info("ALBERT model and tokenizer loaded and quantized on CPU")
+                    logger.info("DistilBERT model and tokenizer loaded and quantized on CPU")
                 except Exception as e:
                     logger.error(f"Failed to load the model and tokenizer: {e}")
                     raise
@@ -99,8 +100,10 @@ def sanitize_text(text: str, max_length: int = 1000) -> str:
     return sanitized
 
 
+# Apply memory profiling to this function
+# @profile
 @app.post("/faq/")
-@cache(expire=60)
+@cache(expire=60*5)
 async def call_faq_pipeline(faq_request: FAQRequest):
     try:
         # Sanitize inputs
@@ -125,7 +128,7 @@ async def call_faq_pipeline(faq_request: FAQRequest):
 
         # Tokenize the inputs
         inputs = model_manager.tokenizer.encode_plus(
-            sanitized_question, sanitized_context, return_tensors="pt"
+            sanitized_question, sanitized_context, max_length=512, truncation=True, return_tensors="pt"
         )
 
         # Run model inference
@@ -134,10 +137,17 @@ async def call_faq_pipeline(faq_request: FAQRequest):
             start_scores = outputs.start_logits
             end_scores = outputs.end_logits
 
+        # Debugging: Log the scores
+        logger.info(f"Start scores: {start_scores}")
+        logger.info(f"End scores: {end_scores}")
+
         # Convert tokens to text
         all_tokens = model_manager.tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
         start_idx = torch.argmax(start_scores)
         end_idx = torch.argmax(end_scores) + 1
+
+        # Debugging: Log token span
+        logger.info(f"Token span: {all_tokens[start_idx:end_idx]}")
 
         # Handle empty or invalid answers
         if start_idx >= len(all_tokens) or end_idx > len(all_tokens):
@@ -146,9 +156,10 @@ async def call_faq_pipeline(faq_request: FAQRequest):
 
         answer = ' '.join(all_tokens[start_idx:end_idx])
 
-        if not answer:
-            logger.error("Model did not return an answer.")
-            raise HTTPException(status_code=500, detail="Model failed to provide an answer.")
+        # If answer is empty or invalid, return a proper message
+        if not answer or answer == "[CLS]":
+            logger.error("Model returned an empty or invalid answer.")
+            raise HTTPException(status_code=500, detail="Model failed to provide a valid answer.")
 
         return {"answer": answer}
 
