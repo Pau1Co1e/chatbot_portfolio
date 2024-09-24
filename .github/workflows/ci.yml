@@ -14,47 +14,48 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Check out code
-      uses: actions/checkout@v2
+      - name: Check out code
+        uses: actions/checkout@v2
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest  # Ensure pytest is installed
 
-    - name: Run tests
-      run: |
-        pytest
+      - name: Run tests
+        run: pytest  # Run pytest to execute tests
 
   deploy:
-    if: github.ref == 'refs/heads/main'
-    needs: test
+    if: github.ref == 'refs/heads/main'  # Only deploy on main branch
+    needs: test  # Ensure tests pass before deployment
     runs-on: ubuntu-latest
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Check out code
+        uses: actions/checkout@v2
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-    - name: Deploy to Render
-      run: |
-        # Trigger deployment (you need the Render API key for this)
-        curl -X POST -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
-        -d '{"serviceId": "your-render-service-id"}' \
-        https://api.render.com/v1/services/your-render-service-id/deploys
+      - name: Deploy to Render
+        run: |
+          # Trigger deployment using Render API key
+          curl -X POST -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+          -d '{"serviceId": "srv-crnd58o8fa8c738ds150"}' \
+          https://api.render.com/v1/services/srv-crnd58o8fa8c738ds150/deploys
 
-      env:
-        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}  # Load the Render API key from GitHub secrets
