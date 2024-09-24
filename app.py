@@ -2,35 +2,37 @@ import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from transformers import pipeline
 import torch
+from transformers import pipeline
 import os
 import re
 import asyncio
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
+import aioredis
 
 # Environment Variables
-PORT = int(os.getenv("PORT", 8000))  # Updated default port to 8000
-FLASK_APP_ORIGIN = os.getenv("FLASK_APP_ORIGIN", "https://codebloodedfamily.com")  # Made configurable
+PORT = int(os.getenv("PORT", 8000))
+FLASK_APP_ORIGIN = os.getenv("FLASK_APP_ORIGIN", "https://codebloodedfamily.com")
 
 # Initialize FastAPI app
 app = FastAPI()
 
-# CORS Middleware for Production
+# CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow requests from Flask app's origin
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Logging Configuration for Production
+# Logging Configuration
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger("faq_pipeline")
-
 
 # Load the Model at Startup
 class ModelManager:
@@ -39,91 +41,66 @@ class ModelManager:
         self.pipeline = None
 
     async def load_model(self):
-        """
-        Lazy loading of the model. Loads the model only once and reuses it.
-        Forces execution on CPU.
-        """
         async with self.lock:
             if self.pipeline is None:
                 try:
-                    # Load model only if not already loaded
-                    device = "cpu"  # Force CPU execution
                     self.pipeline = pipeline(
                         "question-answering",
                         model="distilbert-base-cased-distilled-squad",
-                        device=-1  # Force to CPU by setting device=-1
+                        device=-1  # CPU only
                     )
                     logger.info(f"Model loaded on CPU")
                 except Exception as e:
                     logger.error(f"Failed to load the model: {e}")
                     raise
 
-
 model_manager = ModelManager()
-
 
 @app.on_event("startup")
 async def startup_event():
-    # Lazy model loading; not loading model on startup anymore.
-    logger.info("Application started. Model will be loaded upon first request.")
+    await model_manager.load_model()
 
+    # Redis setup for caching
+    redis = aioredis.from_url("redis://red-cror6njqf0us73eeqr0g:6379", encoding="utf-8", decode_responses=True)
+    FastAPICache.init(RedisBackend(redis), prefix="faq_cache")
 
 # Pydantic Model for FAQ Request
 class FAQRequest(BaseModel):
-    question: str = Field(..., max_length=200, description="The question to answer")
-    context: str = Field(..., max_length=1000, description="The context for the question")
-
+    question: str = Field(..., max_length=200)
+    context: str = Field(..., max_length=1000)
 
 # Helper function for sanitization
 def sanitize_text(text: str, max_length: int = 1000) -> str:
-    """
-    Sanitizes input text by limiting length and removing excessive whitespace.
-    """
     sanitized = re.sub(r'\s+', ' ', text).strip()
     if len(sanitized) > max_length:
         sanitized = sanitized[:max_length]
     return sanitized
 
+# Caching Decorator
+from fastapi_cache.decorator import cache
 
-# Helper function for lazy model loading
-async def get_model():
-    """
-    Ensures the model is loaded and returns it. If already loaded, returns the cached model.
-    """
-    if model_manager.pipeline is None:
-        await model_manager.load_model()
-    return model_manager.pipeline
-
-
-# Endpoint for FAQ Model
 @app.post("/faq/")
+@cache(expire=60)  # Cache the result for 60 seconds
 async def call_faq_pipeline(faq_request: FAQRequest):
     try:
-        # Sanitize inputs
         sanitized_question = sanitize_text(faq_request.question, max_length=200)
         sanitized_context = sanitize_text(faq_request.context, max_length=1000)
 
-        # Log the incoming request
         logger.info({
             'action': 'faq_pipeline_called',
             'question': sanitized_question,
-            'context_snippet': (sanitized_context[:50] + '...') if len(sanitized_context) > 50 else sanitized_context
+            'context_snippet': sanitized_context[:50] + '...' if len(sanitized_context) > 50 else sanitized_context
         })
 
-        # Prepare inputs for the model
-        inputs = {
-            "question": sanitized_question,
-            "context": sanitized_context
-        }
+        inputs = {"question": sanitized_question, "context": sanitized_context}
 
-        # Get the model (load it if not already loaded)
-        pipeline = await get_model()
+        if model_manager.pipeline is None:
+            await model_manager.load_model()
 
-        # Use asyncio to run the blocking inference in a separate thread
+        # Run model inference
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, pipeline, inputs)
+        result = await loop.run_in_executor(None, model_manager.pipeline, inputs)
 
-        # Validate the model's response
         if "answer" not in result:
             logger.error("Model did not return an answer.")
             raise HTTPException(status_code=500, detail="Model failed to provide an answer.")
@@ -131,7 +108,6 @@ async def call_faq_pipeline(faq_request: FAQRequest):
         return {"answer": result["answer"]}
 
     except HTTPException as http_exc:
-        # Re-raise HTTPExceptions
         raise http_exc
     except Exception as e:
         logger.error(f"Unhandled error: {e}", exc_info=True)
