@@ -58,8 +58,8 @@ class ModelManager:
             if self.model is None or self.tokenizer is None:
                 try:
                     # Load tokenizer and model
-                    self.tokenizer = AlbertTokenizer.from_pretrained('albert-base-v2')
-                    self.model = AlbertForQuestionAnswering.from_pretrained('albert-base-v2')
+                    self.tokenizer = AlbertTokenizer.from_pretrained('twmkn9/albert-base-v2-squad2')
+                    self.model = AlbertForQuestionAnswering.from_pretrained('twmkn9/albert-base-v2-squad2')
 
                     # Apply dynamic quantization (architecture-agnostic)
                     self.model = torch.quantization.quantize_dynamic(
@@ -69,6 +69,7 @@ class ModelManager:
                 except Exception as e:
                     logger.error(f"Failed to load the model and tokenizer: {e}")
                     raise
+
 
 model_manager = ModelManager()
 
@@ -123,20 +124,18 @@ async def call_faq_pipeline(faq_request: FAQRequest):
             await model_manager.load_model()
 
         # Tokenize the inputs
-        inputs = model_manager.tokenizer(sanitized_question, sanitized_context, return_tensors="pt")
+        inputs = model_manager.tokenizer.encode_plus(
+            sanitized_question, sanitized_context, return_tensors="pt"
+        )
 
-        # Run model inference using positional arguments
-        def model_inference(input_ids, attention_mask):
-            return model_manager.model(input_ids=input_ids, attention_mask=attention_mask)
+        # Run model inference
+        with torch.no_grad():
+            outputs = model_manager.model(**inputs)
+            start_scores = outputs.start_logits
+            end_scores = outputs.end_logits
 
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, model_inference, inputs["input_ids"], inputs["attention_mask"])
-
-        # Extract the answer from the model's output
-        start_scores, end_scores = result.start_logits, result.end_logits
-
-        # Ensure that start_scores and end_scores are tensors
-        all_tokens = model_manager.tokenizer.convert_ids_to_tokens(inputs["input_ids"].tolist()[0])
+        # Convert tokens to text
+        all_tokens = model_manager.tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
         start_idx = torch.argmax(start_scores)
         end_idx = torch.argmax(end_scores) + 1
 
