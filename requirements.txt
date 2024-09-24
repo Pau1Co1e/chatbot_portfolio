@@ -9,4 +9,5 @@ python-json-logger==2.0.7
 safetensors==0.4.5
 tqdm~=4.66.5
 aioredis==2.0.1
+redis==4.6.0
 fastapi-cache2==0.2.2
