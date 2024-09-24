@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import torch
-from transformers import pipeline, AutoModelForQuestionAnswering, AutoTokenizer
+from transformers import pipeline
 import os
 import re
 import asyncio
@@ -11,6 +11,7 @@ from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
 from redis.asyncio.client import Redis
 from fastapi_cache.decorator import cache
+from pydantic import ValidationError
 
 # Environment Variables
 PORT = int(os.getenv("PORT", 8000))
@@ -35,49 +36,47 @@ logging.basicConfig(
 )
 logger = logging.getLogger("faq_pipeline")
 
-# Model Manager with Quantization and Lazy Loading
+
+# Load the Model at Startup
 class ModelManager:
     def __init__(self):
         self.lock = asyncio.Lock()
         self.pipeline = None
-        self.tokenizer = None
 
     async def load_model(self):
         async with self.lock:
             if self.pipeline is None:
                 try:
-                    # Load the tokenizer and model with quantization
-                    logger.info("Loading model...")
-                    self.tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
-                    model = AutoModelForQuestionAnswering.from_pretrained("distilbert-base-uncased")
-
-                    # Apply dynamic quantization to the model for memory optimization
-                    model = torch.quantization.quantize_dynamic(model, {torch.nn.Linear}, dtype=torch.qint8)
-
                     self.pipeline = pipeline(
                         "question-answering",
-                        model=model,
-                        tokenizer=self.tokenizer,
+                        model="distilbert-base-cased-distilled-squad",
                         device=-1  # CPU only
                     )
-                    logger.info(f"Model loaded and quantized on CPU")
+                    logger.info(f"Model loaded on CPU")
                 except Exception as e:
                     logger.error(f"Failed to load the model: {e}")
                     raise
 
+
 model_manager = ModelManager()
+
 
 @app.on_event("startup")
 async def startup_event():
-    # Lazy loading of the model, no longer loading it immediately on startup
+    await model_manager.load_model()
+
     # Redis setup for caching, ensuring it expects byte responses
     redis = Redis.from_url("redis://red-cror6njqf0us73eeqr0g:6379", decode_responses=False)
+
+    # Initialize FastAPI cache with Redis backend
     FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
+
 
 # Pydantic Model for FAQ Request
 class FAQRequest(BaseModel):
     question: str = Field(..., max_length=200)
     context: str = Field(..., max_length=1000)
+
 
 # Helper function for sanitization
 def sanitize_text(text: str, max_length: int = 1000) -> str:
@@ -86,13 +85,24 @@ def sanitize_text(text: str, max_length: int = 1000) -> str:
         sanitized = sanitized[:max_length]
     return sanitized
 
+
 # Caching Decorator
+# Import Pydantic validation errors
+
+
 @app.post("/faq/")
-@cache(expire=60)  # Cache the result for 60 seconds
+@cache(expire=60)
 async def call_faq_pipeline(faq_request: FAQRequest):
     try:
+        # Sanitize inputs
         sanitized_question = sanitize_text(faq_request.question, max_length=200)
         sanitized_context = sanitize_text(faq_request.context, max_length=1000)
+
+        # Validate inputs explicitly
+        if not sanitized_question:
+            raise HTTPException(status_code=422, detail="`question` cannot be empty.")
+        if not sanitized_context:
+            raise HTTPException(status_code=422, detail="`context` cannot be empty.")
 
         logger.info({
             'action': 'faq_pipeline_called',
@@ -117,6 +127,14 @@ async def call_faq_pipeline(faq_request: FAQRequest):
 
     except HTTPException as http_exc:
         raise http_exc
+    except ValidationError as val_err:
+        logger.error(f"Validation error: {val_err}")
+        raise HTTPException(status_code=422, detail=str(val_err))
     except Exception as e:
         logger.error(f"Unhandled error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An internal error occurred.")
+
+
+@app.get("/")
+async def health_check():
+    return {"status": "healthy"}
