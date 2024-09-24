@@ -18,9 +18,9 @@ app = FastAPI()
 # CORS Middleware for Production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FLASK_APP_ORIGIN],  # Allow requests from Flask app's origin
+    allow_origins=["*"],  # Allow requests from Flask app's origin
     allow_credentials=True,
-    allow_methods=["POST"],  # Only allow POST if that's the only endpoint
+    allow_methods=["*"],  # Only allow POST if that's the only endpoint
     allow_headers=["*"],
 )
 
@@ -30,6 +30,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger("faq_pipeline")
+
 
 # Load the Model at Startup
 class ModelManager:
@@ -51,16 +52,20 @@ class ModelManager:
                     logger.error(f"Failed to load the model: {e}")
                     raise
 
+
 model_manager = ModelManager()
+
 
 @app.on_event("startup")
 async def startup_event():
     await model_manager.load_model()
 
+
 # Pydantic Model for FAQ Request
 class FAQRequest(BaseModel):
     question: str = Field(..., max_length=200, description="The question to answer")
     context: str = Field(..., max_length=1000, description="The context for the question")
+
 
 # Helper function for sanitization
 def sanitize_text(text: str, max_length: int = 1000) -> str:
@@ -71,6 +76,7 @@ def sanitize_text(text: str, max_length: int = 1000) -> str:
     if len(sanitized) > max_length:
         sanitized = sanitized[:max_length]
     return sanitized
+
 
 # Endpoint for FAQ Model
 @app.post("/faq/")
