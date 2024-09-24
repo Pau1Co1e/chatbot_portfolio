@@ -9,7 +9,7 @@ import re
 import asyncio
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
-import aioredis
+from redis.asyncio.client import Redis
 
 # Environment Variables
 PORT = int(os.getenv("PORT", 8000))
@@ -60,9 +60,11 @@ model_manager = ModelManager()
 async def startup_event():
     await model_manager.load_model()
 
-    # Redis setup for caching
-    redis = aioredis.from_url("redis://red-cror6njqf0us73eeqr0g:6379", encoding="utf-8", decode_responses=True)
-    FastAPICache.init(RedisBackend(redis), prefix="faq_cache")
+    # Redis setup for caching, ensuring it expects byte responses
+    redis = Redis.from_url("redis://red-cror6njqf0us73eeqr0g:6379", decode_responses=False)
+
+    # Initialize FastAPI cache with Redis backend
+    FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
 
 # Pydantic Model for FAQ Request
 class FAQRequest(BaseModel):
