@@ -3,14 +3,14 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import torch
-from transformers import pipeline
+from transformers import pipeline, AutoModelForQuestionAnswering, AutoTokenizer
 import os
 import re
 import asyncio
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
 from redis.asyncio.client import Redis
-from fastapi_cache.decorator import cache  # <-- This is the missing import
+from fastapi_cache.decorator import cache
 
 # Environment Variables
 PORT = int(os.getenv("PORT", 8000))
@@ -35,22 +35,32 @@ logging.basicConfig(
 )
 logger = logging.getLogger("faq_pipeline")
 
-# Load the Model at Startup
+# Model Manager with Quantization and Lazy Loading
 class ModelManager:
     def __init__(self):
         self.lock = asyncio.Lock()
         self.pipeline = None
+        self.tokenizer = None
 
     async def load_model(self):
         async with self.lock:
             if self.pipeline is None:
                 try:
+                    # Load the tokenizer and model with quantization
+                    logger.info("Loading model...")
+                    self.tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
+                    model = AutoModelForQuestionAnswering.from_pretrained("distilbert-base-uncased")
+
+                    # Apply dynamic quantization to the model for memory optimization
+                    model = torch.quantization.quantize_dynamic(model, {torch.nn.Linear}, dtype=torch.qint8)
+
                     self.pipeline = pipeline(
                         "question-answering",
-                        model="distilbert-base-cased-distilled-squad",
+                        model=model,
+                        tokenizer=self.tokenizer,
                         device=-1  # CPU only
                     )
-                    logger.info(f"Model loaded on CPU")
+                    logger.info(f"Model loaded and quantized on CPU")
                 except Exception as e:
                     logger.error(f"Failed to load the model: {e}")
                     raise
@@ -59,12 +69,9 @@ model_manager = ModelManager()
 
 @app.on_event("startup")
 async def startup_event():
-    await model_manager.load_model()
-
+    # Lazy loading of the model, no longer loading it immediately on startup
     # Redis setup for caching, ensuring it expects byte responses
     redis = Redis.from_url("redis://red-cror6njqf0us73eeqr0g:6379", decode_responses=False)
-
-    # Initialize FastAPI cache with Redis backend
     FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
 
 # Pydantic Model for FAQ Request
