@@ -2,7 +2,6 @@ import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-import torch
 from transformers import pipeline
 import os
 import re
@@ -20,7 +19,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allow requests from Flask app's origin
     allow_credentials=True,
-    allow_methods=["*"],  # Only allow POST if that's the only endpoint
+    allow_methods=["*"],  # Allow all methods
     allow_headers=["*"],
 )
 
@@ -39,15 +38,21 @@ class ModelManager:
         self.pipeline = None
 
     async def load_model(self):
+        """
+        Lazy loading of the model. Loads the model only once and reuses it.
+        Forces execution on CPU.
+        """
         async with self.lock:
             if self.pipeline is None:
                 try:
+                    # Load model only if not already loaded
+                    device = "cpu"  # Force CPU execution
                     self.pipeline = pipeline(
                         "question-answering",
                         model="distilbert-base-cased-distilled-squad",
-                        device=0 if torch.cuda.is_available() else -1
+                        device=-1  # Force to CPU by setting device=-1
                     )
-                    logger.info(f"Model loaded on {'GPU' if torch.cuda.is_available() else 'CPU'}")
+                    logger.info(f"Model loaded on CPU")
                 except Exception as e:
                     logger.error(f"Failed to load the model: {e}")
                     raise
@@ -58,7 +63,8 @@ model_manager = ModelManager()
 
 @app.on_event("startup")
 async def startup_event():
-    await model_manager.load_model()
+    # Lazy model loading; not loading model on startup anymore.
+    logger.info("Application started. Model will be loaded upon first request.")
 
 
 # Pydantic Model for FAQ Request
@@ -76,6 +82,16 @@ def sanitize_text(text: str, max_length: int = 1000) -> str:
     if len(sanitized) > max_length:
         sanitized = sanitized[:max_length]
     return sanitized
+
+
+# Helper function for lazy model loading
+async def get_model():
+    """
+    Ensures the model is loaded and returns it. If already loaded, returns the cached model.
+    """
+    if model_manager.pipeline is None:
+        await model_manager.load_model()
+    return model_manager.pipeline
 
 
 # Endpoint for FAQ Model
@@ -99,13 +115,12 @@ async def call_faq_pipeline(faq_request: FAQRequest):
             "context": sanitized_context
         }
 
-        # Perform model inference with proper error handling
-        if model_manager.pipeline is None:
-            await model_manager.load_model()
+        # Get the model (load it if not already loaded)
+        pipeline = await get_model()
 
         # Use asyncio to run the blocking inference in a separate thread
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, model_manager.pipeline, inputs)
+        result = await loop.run_in_executor(None, pipeline, inputs)
 
         # Validate the model's response
         if "answer" not in result:
