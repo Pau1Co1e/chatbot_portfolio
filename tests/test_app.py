@@ -22,12 +22,14 @@ def test_healthcheck():
     data = response.json()
     assert data == {"status": "healthy"}
 
+
 def test_faq_invalid_input():
     response = client.post("/faq/", json={"question": "", "context": ""})
     assert response.status_code == 422  # Unprocessable Entity
     data = response.json()
     assert "detail" in data
-    assert len(data["detail"]) > 0
+    assert data["detail"] == "`question` cannot be empty."
+
 
 def test_faq_long_input():
     long_context = "a" * 2000  # Exceeds the 1000-character limit
