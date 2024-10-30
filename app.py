@@ -86,10 +86,6 @@ def sanitize_text(text: str, max_length: int = 1000) -> str:
     return sanitized
 
 
-# Caching Decorator
-# Import Pydantic validation errors
-
-
 @app.post("/faq/")
 @cache(expire=60)
 async def call_faq_pipeline(faq_request: FAQRequest):
@@ -109,6 +105,19 @@ async def call_faq_pipeline(faq_request: FAQRequest):
             'question': sanitized_question,
             'context_snippet': sanitized_context[:50] + '...' if len(sanitized_context) > 50 else sanitized_context
         })
+
+        # Keyword detection for branching
+        keywords = {
+            "experience": get_experience_response,
+            "skills": get_skills_response,
+            "education": get_education_response,
+            "projects": get_projects_response
+        }
+
+        # Check for keywords in the question and branch accordingly
+        for key, response_function in keywords.items():
+            if key in sanitized_question.lower():
+                return await response_function()
 
         inputs = {"question": sanitized_question, "context": sanitized_context}
 
@@ -134,6 +143,35 @@ async def call_faq_pipeline(faq_request: FAQRequest):
         logger.error(f"Unhandled error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An internal error occurred.")
 
+# Response functions for keyword-based branching
+async def get_experience_response():
+    return {
+        "answer": "I have over 5 years of experience in software development, focusing on artificial intelligence, "
+                  "machine learning, full-stack development, and robotics. I've worked extensively with frameworks like Flask, "
+                  "ASP.NET, and FastAPI, and contributed to projects ranging from financial prediction models to "
+                  "deepfake detection systems."
+    }
+
+async def get_skills_response():
+    return {
+        "answer": "My core skills include Python programming, machine learning (using frameworks such as TensorFlow "
+                  "and PyTorch), full-stack web development with technologies like Flask, ASP.NET, and SQLAlchemy, "
+                  "and project development in AI, finance, and cybersecurity."
+    }
+
+async def get_education_response():
+    return {
+        "answer": "I am currently pursuing my Master's degree in Computer Science at Utah Valley University, "
+                  "focusing on AI and machine learning for finance and cybersecurity. I graduated with a BSc in "
+                  "Computer Science in 2022."
+    }
+
+async def get_projects_response():
+    return {
+        "answer": "Some of my notable projects include a fractal dimension calculator, a stock market analysis predictor, "
+                  "and a chatbot application integrated into my personal portfolio website. These projects highlight my "
+                  "expertise in machine learning, mathematics, and practical AI applications."
+    }
 
 @app.get("/")
 async def health_check():
