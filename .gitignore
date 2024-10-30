@@ -4,15 +4,72 @@
 __pycache__/
 *.py[cod]
 
-# IntelliJ project files
-.idea
-*.iml
-out
-gen
 
-/.venv/
-.venv
-/.venv
-misc.xml
-.idea/misc.xml
-test_main.http
+tests/test_main.http
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+*.egg
+*.egg-info/
+dist/
+build/
+*.pyc
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+*.out
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# PyCharm specific
+.idea/
+*.iml
+*.iws
+
+# Database
+*.sqlite3
+
+# PyCharm project management
+*.pydevproject
+
+# Local environment variables
+.env
+.env.*
+
+# VSCode specific (if you use it)
+.vscode/
+
+# macOS specific
+.DS_Store
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
