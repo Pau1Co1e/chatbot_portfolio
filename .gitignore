@@ -73,3 +73,4 @@ coverage.xml
 # Windows specific
 Thumbs.db
 ehthumbs.db
+/requirements.yaml
