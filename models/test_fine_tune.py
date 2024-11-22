@@ -2,7 +2,7 @@ from transformers import pipeline
 
 def test_qa_pipeline():
     # Load fine-tuned model
-    qa_pipeline = pipeline("question-answering", model="./model/fine_tune.py", tokenizer="./fine_tuned_model")
+    qa_pipeline = pipeline("question-answering", model="./model/fine_tune.py", tokenizer="./model/fine_tuned_model")
 
     # Define test cases
     test_cases = [
@@ -15,6 +15,16 @@ def test_qa_pipeline():
             "question": "What are your professional skills?",
             "context": "Paul Coleman is skilled in AI & Machine Learning, NLP, and scalable system design.",
             "expected": "AI & Machine Learning"
+        },
+        {
+            "question": "Where have you worked recently?",
+            "context": "Paul Coleman worked as a Full Stack Software Engineer at ResNexus from September 2023 to December 2023. He developed backend APIs and frontend components using the Microsoft tech stack for hotel and rental management products.",
+            "expected": "Full Stack Software Engineer at ResNexus"
+        },
+        {
+            "question": "What volunteer experience do you have?",
+            "context": "Paul Coleman organized a local donation event for the Northern Utah Habitat for Humanity Clothing Drive in June 2014, supporting children and families in the Dominican Republic.",
+            "expected": "Northern Utah Habitat for Humanity Clothing Drive"
         }
     ]
 
