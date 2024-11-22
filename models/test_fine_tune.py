@@ -2,7 +2,7 @@ from transformers import pipeline
 
 def test_qa_pipeline():
     # Load fine-tuned model
-    qa_pipeline = pipeline("question-answering", model="./model/fine_tune.py", tokenizer="./model/fine_tuned_model")
+    qa_pipeline = pipeline("question-answering", model="fine_tune.py", tokenizer="./fine_tuned_model")
 
     # Define test cases
     test_cases = [
