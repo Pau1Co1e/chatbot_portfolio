@@ -6,16 +6,17 @@ import numpy as np
 
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 import torch
-import evaluate
+from evaluate import load
 import pandas as pd
 from datasets import load_from_disk
 from transformers import (
     AutoModelForQuestionAnswering,
     AutoTokenizer,
+    default_data_collator,
     EarlyStoppingCallback,
+    EvalPrediction,
     Trainer,
     TrainingArguments,
-    default_data_collator, EvalPrediction
 )
 
 
@@ -23,7 +24,7 @@ from transformers import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-metric = evaluate.load("squad")
+metric = load("squad")
 
 # Set device for computation
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -346,12 +347,9 @@ def compute_metrics(p: EvalPrediction):
     start_positions = torch.tensor(start_positions)
     end_positions = torch.tensor(end_positions)
 
-    # Compute the loss for start and end positions
-    start_loss = cross_entropy(start_logits, start_positions).float()
-    end_loss = cross_entropy(end_logits, end_positions).float()
-
-    # Compute the average loss using float division
-    total_loss = (start_loss + end_loss) / 2.0
+    start_loss = cross_entropy(start_logits, start_positions)
+    end_loss = cross_entropy(end_logits, end_positions)
+    total_loss = (start_loss + end_loss) / 2
 
     # Post-process predictions
     final_predictions = postprocess_qa_predictions(
@@ -368,13 +366,13 @@ def compute_metrics(p: EvalPrediction):
     references = [{"id": ex["id"], "answers": ex["answers"]} for ex in val_dataset]
 
     # Load the metric
-    metric = evaluate.load("squad")
+    metric = load("squad")
 
     # Compute the metrics
     squad_metrics = metric.compute(predictions=final_predictions, references=references)
 
     # Include the loss in the metrics dictionary
-    squad_metrics["eval_loss"] = total_loss.item()
+    squad_metrics["loss"] = total_loss.item()
 
     # Print metrics
     print(f"Metrics: {squad_metrics}")
@@ -558,22 +556,22 @@ if __name__ == "__main__":
         num_train_epochs=3,
         weight_decay=0.005,
         load_best_model_at_end=True,
-        metric_for_best_model="eval_loss",  # Ensure this key exists in metrics
+        metric_for_best_model="loss",  # Ensure this key exists in metrics
         greater_is_better=False,  # Lower loss is better
         logging_steps=10,
     )
 
     # Initialize Trainer
-    metric = evaluate.load("squad")
+    # metric = load("squad")
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=tokenized_train_dataset,
         eval_dataset=tokenized_val_dataset,
-        tokenizer=tokenizer,
-        data_collator=default_data_collator,
+        # tokenizer=tokenizer,
+        # data_collator=default_data_collator,
         compute_metrics=compute_metrics,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+        # callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
 
     # Train and save model
