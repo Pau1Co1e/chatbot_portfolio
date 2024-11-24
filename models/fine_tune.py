@@ -1,30 +1,32 @@
 import collections
-from datasets import Dataset, concatenate_datasets
-import os
+from datasets import Dataset, concatenate_datasets, Features, Sequence, Value, load_from_disk
+from evaluate import load
 import logging
 import numpy as np
+import os
 
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-import torch
-from evaluate import load
 import pandas as pd
-from datasets import load_from_disk
+import torch
 from transformers import (
     AutoModelForQuestionAnswering,
     AutoTokenizer,
-    default_data_collator,
-    EarlyStoppingCallback,
     EvalPrediction,
     Trainer,
     TrainingArguments,
+    EarlyStoppingCallback,
+    default_data_collator,
+    DistilBertModel,
+    DistilBertForQuestionAnswering,
+    DistilBertTokenizer,
+    pipeline
 )
-
 
 # Initialize Logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-metric = load("squad")
+squad_metric = load("squad")
 
 # Set device for computation
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -35,6 +37,7 @@ CUSTOM_DATA_DIR = "../models/dataset/"
 OUTPUT_DIR = "../models/fine_tuned_model/"
 CACHE_DIR = "../models/cache/"
 MODEL_DIR = "../models/fine_tuned_model/"
+
 
 # Load datasets from parquet files
 def load_squad_datasets_from_parquet(train_path, validation_path):
@@ -70,10 +73,22 @@ def load_custom_dataset(flat_data):
     return Dataset.from_pandas(pd.DataFrame(processed_data))
 
 
+def normalize(self, item):
+    if isinstance(item, SquadExample):
+        return item
+    elif isinstance(item, dict):
+        for k in ["question", "context"]:
+            if k not in item:
+                raise KeyError("You need to provide a dictionary with keys {question:..., context:...}")
+            elif item[k] is None:
+                raise ValueError(f"`{k}` cannot be None")
+            elif isinstance(item[k], str) and len(item[k]) == 0:
+                raise ValueError(f"`{k}` cannot be empty")
+
+        return QuestionAnsweringPipeline.create_sample(**item)
+    raise ValueError(f"{item} argument needs to be of type (SquadExample, dict)")
 # Combine datasets with schema alignment
 def combine_datasets(custom_dataset, squad_dataset):
-    from datasets import Features, Sequence, Value
-
     # Define the common feature schema
     dataset_features = Features({
         "id": Value("string"),
@@ -100,7 +115,6 @@ def combine_datasets(custom_dataset, squad_dataset):
         }
 
     # Align schema for custom dataset
-    # custom_dataset = custom_dataset.map(align_schema, batched=False)
     custom_dataset = custom_dataset.map(align_schema, batched=False, new_fingerprint="custom_align_schema")
     # Align schema for SQuAD dataset
     squad_dataset = squad_dataset.map(align_schema, batched=False, new_fingerprint="squad_align_schema")
@@ -130,7 +144,7 @@ def preprocess_eval_data(examples, tokenizer):
         examples["question"],
         examples["context"],
         truncation="only_second",
-        max_length=384,
+        max_length=512,
         stride=128,
         return_overflowing_tokens=True,
         return_offsets_mapping=True,  # Necessary for mapping tokens back to context
@@ -219,7 +233,7 @@ def preprocess_train_data(examples, tokenizer):
     return tokenized_examples
 
 
-def load_or_preprocess_dataset(train_dataset, val_dataset, tokenizer, cache_dir=CACHE_DIR, force_retokenize=False):
+def load_or_preprocess_dataset(train_dataset, val_dataset, tokenizer, force_retokenize, cache_dir=CACHE_DIR):
     train_cache_path = os.path.join(cache_dir, "train")
     val_cache_path = os.path.join(cache_dir, "val")
 
@@ -230,7 +244,7 @@ def load_or_preprocess_dataset(train_dataset, val_dataset, tokenizer, cache_dir=
             preprocess_train_data,
             batched=True,
             remove_columns=train_dataset.column_names,
-            num_proc=os.cpu_count(),
+            num_proc=max(1, os.cpu_count() - 2),
             fn_kwargs={'tokenizer': tokenizer}
         )
 
@@ -238,7 +252,7 @@ def load_or_preprocess_dataset(train_dataset, val_dataset, tokenizer, cache_dir=
             preprocess_eval_data,
             batched=True,
             remove_columns=val_dataset.column_names,
-            num_proc=os.cpu_count(),
+            num_proc=max(1, os.cpu_count() - 2),
             fn_kwargs={'tokenizer': tokenizer}
         )
 
@@ -254,15 +268,14 @@ def load_or_preprocess_dataset(train_dataset, val_dataset, tokenizer, cache_dir=
 
 
 def postprocess_qa_predictions(
-    examples,
-    features,
-    predictions,
-    version_2_with_negative=False,
-    n_best_size=20,
-    max_answer_length=30,
-    null_score_diff_threshold=0.0,
+        examples,
+        features,
+        predictions,
+        version_2_with_negative=False,
+        n_best_size=20,
+        max_answer_length=30,
+        null_score_diff_threshold=0.0,
 ):
-
     all_start_logits, all_end_logits = predictions
 
     example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
@@ -271,7 +284,7 @@ def postprocess_qa_predictions(
         example_id = feature["example_id"]
         features_per_example[example_id_to_index[example_id]].append(i)
 
-    final_predictions = collections.OrderedDict()
+    final_predictions = dict()
 
     for example_index, example in enumerate(examples):
         feature_indices = features_per_example[example_index]
@@ -285,24 +298,29 @@ def postprocess_qa_predictions(
             end_logits = all_end_logits[feature_index]
             offset_mapping = features[feature_index]["offset_mapping"]
 
-            cls_index = features[feature_index]["input_ids"].index(tokenizer.cls_token_id)
+            try:
+                cls_index = features[feature_index]["input_ids"].index(tokenizer.cls_token_id)
+            except ValueError:
+                logger.warning("CLS token not found in input_ids. Setting cls_index to 0 as fallback.")
+                cls_index = 0
+
             feature_null_score = start_logits[cls_index] + end_logits[cls_index]
 
             if min_null_score is None or min_null_score > feature_null_score:
                 min_null_score = feature_null_score
 
-            start_indexes = np.argsort(start_logits)[-1 : -n_best_size - 1 : -1].tolist()
-            end_indexes = np.argsort(end_logits)[-1 : -n_best_size - 1 : -1].tolist()
+            start_indexes = np.argsort(start_logits)[-1: -n_best_size - 1: -1].tolist()
+            end_indexes = np.argsort(end_logits)[-1: -n_best_size - 1: -1].tolist()
 
             for start_index in start_indexes:
                 for end_index in end_indexes:
                     if (
-                        start_index >= len(offset_mapping)
-                        or end_index >= len(offset_mapping)
-                        or offset_mapping[start_index] is None
-                        or offset_mapping[end_index] is None
-                        or end_index < start_index
-                        or end_index - start_index + 1 > max_answer_length
+                            start_index >= len(offset_mapping)
+                            or end_index >= len(offset_mapping)
+                            or offset_mapping[start_index] is None
+                            or offset_mapping[end_index] is None
+                            or end_index < start_index
+                            or end_index - start_index + 1 > max_answer_length
                     ):
                         continue
 
@@ -337,47 +355,40 @@ def compute_metrics(p: EvalPrediction):
     # Unpack predictions
     start_logits, end_logits = p.predictions
     start_positions, end_positions = p.label_ids
-
-    # Compute the loss between the predicted logits and the true labels
-    from torch.nn.functional import cross_entropy
-
-    # Convert logits and labels to tensors if they're not already
-    start_logits = torch.tensor(start_logits)
-    end_logits = torch.tensor(end_logits)
-    start_positions = torch.tensor(start_positions)
-    end_positions = torch.tensor(end_positions)
-
-    start_loss = cross_entropy(start_logits, start_positions)
-    end_loss = cross_entropy(end_logits, end_positions)
-    total_loss = (start_loss + end_loss) / 2
+    logger.info(f"Test : A")
 
     # Post-process predictions
     final_predictions = postprocess_qa_predictions(
-        examples=val_dataset,
-        features=tokenized_val_dataset,
-        predictions=(start_logits.detach().numpy(), end_logits.detach().numpy()),
+        examples=val_dataset,  # Assuming val_dataset is globally accessible
+        features=tokenized_val_dataset,  # Assuming tokenized_val_dataset is globally accessible
+        predictions=(start_logits, end_logits),
         version_2_with_negative=False,
         n_best_size=20,
         max_answer_length=30,
         null_score_diff_threshold=0.0
     )
 
+    logger.info(f"Test : B")
+
     # Prepare references
     references = [{"id": ex["id"], "answers": ex["answers"]} for ex in val_dataset]
 
-    # Load the metric
-    metric = load("squad")
+    # Compute the metrics using the squad_metric
+    results = squad_metric.compute(predictions=final_predictions, references=references)
+    logger.info(f"Test : C")
+    logger.info(f"Results: {results}")
 
-    # Compute the metrics
-    squad_metrics = metric.compute(predictions=final_predictions, references=references)
+    # Ensure the metric keys have the required 'eval_' prefix
+    metrics = {
+        "eval_f1": results.get("f1", 0.0),  # Use default of 0.0 if not found
+        "eval_exact_match": results.get("exact_match", 0.0)
+    }
 
-    # Include the loss in the metrics dictionary
-    squad_metrics["loss"] = total_loss.item()
+    # Log metrics explicitly to see if they are being computed properly
+    logger.info(f"Computed Metrics: {metrics}")
 
-    # Print metrics
-    print(f"Metrics: {squad_metrics}")
+    return metrics
 
-    return squad_metrics
 
 # Debugging function to inspect features of a dataset
 def inspect_features(dataset, name):
@@ -390,6 +401,7 @@ def inspect_features(dataset, name):
 if __name__ == "__main__":
     # Define the datasets for validation
 
+    # custom_data = os.path.join(CUSTOM_DATA_DIR, "custom_dataset.txt")
     custom_data = [
         {
             "id": "education_and_certifications-0",
@@ -513,7 +525,6 @@ if __name__ == "__main__":
             "answer_start": list(map(np.int32, [18, 76]))
         }
     ]
-
     # Load custom dataset
     custom_dataset = load_custom_dataset(custom_data)
     print(custom_dataset[0])  # Inspect the first example
@@ -529,9 +540,13 @@ if __name__ == "__main__":
     train_dataset, val_dataset = combined_dataset["train"], combined_dataset["test"]
 
     # Initialize tokenizer and model
-    model_name = "distilbert-base-cased-distilled-squad"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForQuestionAnswering.from_pretrained(model_name).to(device)
+    # model_name = "distilbert-base-cased-distilled-squad"
+    #tokenizer = AutoTokenizer.from_pretrained(model_name)
+    #model = AutoModelForQuestionAnswering.from_pretrained(model_name).to(device)
+    model_name = "distilbert-base-uncased-distilled-squad"
+    tokenizer = DistilBertTokenizer.from_pretrained(model_name)
+    model = DistilBertForQuestionAnswering.from_pretrained(model_name)
+    logger.info("Initializing Tokenizer and Model", model_name, model, tokenizer)
 
     # Tokenize datasets
     tokenized_train_dataset, tokenized_val_dataset = load_or_preprocess_dataset(
@@ -545,37 +560,44 @@ if __name__ == "__main__":
     print("Tokenized validation dataset columns:", tokenized_val_dataset.column_names)
     print("Sample of tokenized validation dataset:", tokenized_val_dataset[0])
 
-    # Define training arguments
     training_args = TrainingArguments(
         output_dir=MODEL_DIR,
-        evaluation_strategy="epoch",  # Ensure evaluation occurs every epoch
+        eval_strategy="epoch",  # Ensure evaluation occurs every epoch
         save_strategy="epoch",
         learning_rate=2e-5,
         per_device_train_batch_size=128,
         per_device_eval_batch_size=256,
         num_train_epochs=3,
-        weight_decay=0.005,
+        weight_decay=0.01,
         load_best_model_at_end=True,
-        metric_for_best_model="loss",  # Ensure this key exists in metrics
-        greater_is_better=False,  # Lower loss is better
+        metric_for_best_model="eval_f1",  # This must match the key returned in compute_metrics
+        greater_is_better=True,  # True because higher F1 or EM scores are better
         logging_steps=10,
     )
 
-    # Initialize Trainer
-    # metric = load("squad")
     trainer = Trainer(
         model=model,
         args=training_args,
-        train_dataset=tokenized_train_dataset,
+        train_dataset=tokenized_train_dataset[],
         eval_dataset=tokenized_val_dataset,
-        # tokenizer=tokenizer,
-        # data_collator=default_data_collator,
+        processing_class=tokenizer,
+        #tokenizer=tokenizer,
+        data_collator=default_data_collator,
         compute_metrics=compute_metrics,
-        # callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
 
+    # Check if evaluation works properly
+    evaluation_metrics = trainer.evaluate()
+    logger.info(f"Evaluation Metrics: {evaluation_metrics}")
+
     # Train and save model
-    trainer.train()
+    try:
+        trainer.train()
+    except KeyError as e:
+        logger.error(f"KeyError during training: {str(e)}")
+        raise
+
     model.save_pretrained(OUTPUT_DIR)
     tokenizer.save_pretrained(OUTPUT_DIR)
     logger.info("Model training and saving complete!")
