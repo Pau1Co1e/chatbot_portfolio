@@ -22,9 +22,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.ba
 
 # Dynamic paths for data loading
 SQUAD_DATA_DIR = "datasets/rajpurkar/squad"
-CUSTOM_DATA_DIR = "./custom_data"
-OUTPUT_DIR = "./fine_tuned_model"
-CACHE_DIR = "./cache"
+CUSTOM_DATA_DIR = "../data/"
+OUTPUT_DIR = "../models/fine_tuned_model/"
+CACHE_DIR = "../models/cache"
 
 # Load SQuAD datasets dynamically
 
@@ -385,8 +385,7 @@ if __name__ == "__main__":
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         greater_is_better=False,
-        tf32=True,
-    )
+        tf32=True    )
 
     trainer = Trainer(
         model=model,
