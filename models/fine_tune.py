@@ -19,12 +19,12 @@ scaler = torch.amp.GradScaler("cuda")
 
 # Check for device
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
-
+tensor_float32 = (True if torch.cuda.is_available() else False)
 # Dynamic paths for data loading
 SQUAD_DATA_DIR = "datasets/rajpurkar/squad"
-CUSTOM_DATA_DIR = "./custom_data"
+CUSTOM_DATA_DIR = "../datasets"
 OUTPUT_DIR = "./fine_tuned_model"
-CACHE_DIR = "./cache"
+CACHE_DIR = "../cache"
 
 # Load SQuAD datasets dynamically
 
@@ -373,10 +373,10 @@ if __name__ == "__main__":
         save_strategy="steps",
         save_steps=500,
         learning_rate=2e-5,
-        num_train_epochs=10,
+        num_train_epochs=3,
         weight_decay=0.005,
-        per_device_train_batch_size=128,
-        per_device_eval_batch_size=256,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=32,
         warmup_steps=500,
         fp16=torch.cuda.is_available(),
         logging_dir="./logs",
@@ -385,7 +385,7 @@ if __name__ == "__main__":
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         greater_is_better=False,
-        tf32=True,
+        tf32=tensor_float32,
     )
 
     trainer = Trainer(
