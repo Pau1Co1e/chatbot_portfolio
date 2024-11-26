@@ -6,9 +6,12 @@ import torch
 
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 
-# Initialize the EDM pipeline
-edm = EDM(dataset_directory="data", model_name="deepset/roberta-base-squad2")
-
+# Initialize the EDM pipeline with the correct dataset path
+edm = EDM(
+    dataset_directory="/Users/paulcoleman/Documents/PersonalCode/chatbot_portfolio/data",
+    model_name="deepset/roberta-base-squad2"
+)
+edm.run_pipeline()
 # Ensure data are loaded and preprocessed
 edm.load_datasets()
 edm.preprocess_datasets()

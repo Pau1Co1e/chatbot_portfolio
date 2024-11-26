@@ -1,10 +1,13 @@
 import os
+
+import datasets
 import pandas as pd
-from datasets import load_dataset, concatenate_datasets
+from datasets import load_dataset, concatenate_datasets, load_dataset
 import matplotlib.pyplot as plt
 from transformers import AutoTokenizer
 from data import squad_v2, custom
 import pyarrow as pa
+import pyarrow.parquet as pq
 
 
 class EDM:
@@ -22,61 +25,40 @@ class EDM:
         self.datasets = None
         self.df_train = None
         self.df_validate = None
+        self.df_custom = None
 
     def load_datasets(self):
         """Load train and validation data from the specified directory."""
-        # Path to the custom JSON file
-        json_path = os.path.join(self.dataset_directory, "custom", "custom_train.json")
+        # Paths
+        restructured_parquet_path = os.path.join(self.dataset_directory, "custom", "custom_train_restructured.parquet")
+        squad_train_path = os.path.join(self.dataset_directory, "squad_v2", "squad_v2_train.parquet")
+        squad_validate_path = os.path.join(self.dataset_directory, "squad_v2", "squad_v2_validate.parquet")
 
-        # Check if the JSON file exists
-        if not os.path.isfile(json_path):
-            raise FileNotFoundError(f"JSON file not found at {json_path}")
+        # Ensure all paths exist
+        if not os.path.exists(restructured_parquet_path):
+            raise FileNotFoundError(f"Custom Parquet file not found at {restructured_parquet_path}")
+        if not os.path.exists(squad_train_path):
+            raise FileNotFoundError(f"SQuAD train file not found at {squad_train_path}")
+        if not os.path.exists(squad_validate_path):
+            raise FileNotFoundError(f"SQuAD validation file not found at {squad_validate_path}")
 
-        # Load JSON data into a pandas DataFrame
-        try:
-            df = pd.read_json(json_path, lines=False)  # Adjust `lines` based on your JSON structure
-            print("JSON data loaded successfully into DataFrame.")
-        except ValueError as e:
-            raise ValueError(f"Error reading JSON file: {e}")
-
-        # Convert pandas DataFrame to pyarrow Table
-        try:
-            table = pa.Table.from_pandas(df)
-            print("DataFrame converted to pyarrow Table.")
-        except Exception as e:
-            raise ValueError(f"Error converting DataFrame to pyarrow Table: {e}")
-
-        # Define the path for the Parquet file
-        parquet_path = os.path.join(self.dataset_directory, "custom", "custom_train.parquet")
-
-        # Write the table to a Parquet file
-        try:
-            pq.write_table(table, parquet_path)
-            print(f"Parquet file written successfully at {parquet_path}")
-        except Exception as e:
-            raise ValueError(f"Error writing Parquet file: {e}")
-
-        # Alternatively, you can use pandas to write Parquet directly:
-        # df.to_parquet(parquet_path, index=False)
-        # print(f"Parquet file written successfully at {parquet_path} using pandas.")
-
-        # Load the datasets using Hugging Face's `load_dataset`
+        # Load datasets using Hugging Face's `load_dataset`
         try:
             self.datasets = load_dataset(
-                "parquet",
+                "parquet",  # Format
                 data_files={
-                    "train": os.path.join(self.dataset_directory, "squad_v2", "squad_v2_train.parquet"),
-                    "validate": os.path.join(self.dataset_directory, "squad_v2", "squad_v2_validate.parquet"),
-                    "custom": parquet_path  # Use the newly created Parquet file
-                },
+                    "train": squad_train_path,
+                    "validate": squad_validate_path,
+                    "custom": restructured_parquet_path
+                }
             )
             print("Datasets loaded successfully.")
         except Exception as e:
-            raise ValueError(f"Error loading datasets: {e}")
+            raise ValueError(f"Error loading datasets with Hugging Face: {e}")
 
-        # Optional: Print dataset details
-        for split in self.datasets:
-            print(f"Loaded {split} split with {len(self.datasets[split])} samples.")
+        # Log dataset information
+        for split, dataset in self.datasets.items():
+            print(f"Loaded '{split}' split with {len(dataset)} samples.")
 
         return self.datasets
 
@@ -101,10 +83,31 @@ class EDM:
         return Dataset.from_pandas(pd.DataFrame(flattened_data))
 
     def preprocess_datasets(self):
-        """Convert train and validation data into Pandas DataFrames."""
+        """Tokenize datasets and convert to Pandas DataFrames."""
+
+        # Tokenize the dataset using Hugging Face tokenizer
+        def tokenize_function(examples):
+            return self.tokenizer(
+                examples["question"],
+                examples["context"],
+                truncation=True,
+                padding="max_length",
+                max_length=512,
+            )
+
+        # Tokenize each split
+        self.datasets = self.datasets.map(tokenize_function, batched=True)
+        print("Datasets tokenized successfully.")
+
+        # Access tokenized fields for inspection (before converting to Pandas)
+        token_lengths = [len(example["input_ids"]) for example in self.datasets["custom"]]
+        print(f"Token Lengths for Custom Dataset: {token_lengths}")
+
+        # Convert to Pandas DataFrame for further analysis
         self.datasets.set_format(type="pandas")
         self.df_train = self.datasets["train"].to_pandas()
         self.df_validate = self.datasets["validate"].to_pandas()
+        self.df_custom = self.datasets["custom"].to_pandas()
         print("Datasets converted to DataFrames.")
 
     @staticmethod
@@ -209,15 +212,20 @@ class EDM:
         """
         Execute the full pipeline for data loading, preprocessing, and analysis.
         """
-        # Load data
+        # Load datasets
         self.load_datasets()
 
-        # Preprocess data
+        # Tokenize and preprocess datasets
         self.preprocess_datasets()
 
-        # Check null values
+        # Check for null values
         self.check_null_values(self.df_train, "Train DataFrame")
         self.check_null_values(self.df_validate, "Validation DataFrame")
+        self.check_null_values(self.df_custom, "Custom DataFrame")
+
+        # Populate `id` and `title` with placeholder values for the custom dataset
+        edm.df_custom["id"] = edm.df_custom["id"].fillna("custom-id-placeholder")
+        edm.df_custom["title"] = edm.df_custom["title"].fillna("custom-title-placeholder")
 
         # Plot question type frequency
         question_types = ["What", "How", "Is", "Does", "Do", "Was", "Where", "Why"]
@@ -228,8 +236,12 @@ class EDM:
         print(f"Question: {question}")
         print(f"Context: {context}")
 
-        # Tokenize and inspect
+        # Tokenize and inspect a single pair
         inputs = self.tokenize_and_inspect(question, context)
         if inputs:
             print("Tokenization successful!")
 
+
+if __name__ == "__main__":
+    edm = EDM(dataset_directory="/Users/paulcoleman/Documents/PersonalCode/chatbot_portfolio/data/", model_name="deepset/roberta-base-squad2")
+    edm.run_pipeline()
