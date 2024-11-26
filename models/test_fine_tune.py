@@ -1,7 +1,7 @@
 from datasets import Dataset
 from difflib import SequenceMatcher
 import torch
-from transformers import pipeline
+from transformers import pipe
 
 
 test_cases = [
@@ -173,12 +173,6 @@ test_cases = [
             "expected": ["AI & Machine Learning", "web development"]
         },
     ]
-
-from datasets import Dataset
-from difflib import SequenceMatcher
-import torch
-from transformers import pipeline
-
 
 def test_qa_pipeline():
     device = torch.device(

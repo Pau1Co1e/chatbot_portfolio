@@ -61,16 +61,16 @@ class ModelManager:
 model_manager = ModelManager()
 
 
-@app.on_event("startup")
-async def startup_event():
-    await model_manager.load_model()
-
-    # Redis setup for caching, ensuring it expects byte responses
-    redis = Redis.from_url("redis://red-cror6njqf0us73eeqr0g:6379", decode_responses=False)
-
-    # Initialize FastAPI cache with Redis backend
-    FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
-
+# @app.on_event("startup")
+# async def startup_event():
+#     await model_manager.load_model()
+#
+#     # Redis setup for caching, ensuring it expects byte responses
+#     redis = Redis.from_url("redis://red-cror6njqf0us73eeqr0g:6379", decode_responses=False)
+#
+#     # Initialize FastAPI cache with Redis backend
+#     FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
+#
 
 # Pydantic Model for FAQ Request
 class FAQRequest(BaseModel):

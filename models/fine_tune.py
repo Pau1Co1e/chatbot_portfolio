@@ -1,12 +1,15 @@
-from datasets import Dataset, concatenate_datasets, load_dataset, load_from_disk
+from datasets import (
+    Dataset,
+    concatenate_datasets,
+    oad_dataset,
+    load_from_disk)
 from transformers import (
     AutoModelForQuestionAnswering,
     AutoTokenizer,
     DataCollatorWithPadding,
     EarlyStoppingCallback,
     Trainer,
-    TrainingArguments,
-)
+    TrainingArguments)
 import torch
 import os
 import evaluate
@@ -21,12 +24,12 @@ scaler = torch.amp.GradScaler("cuda")
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 tensor_float32 = (True if torch.cuda.is_available() else False)
 # Dynamic paths for data loading
-SQUAD_DATA_DIR = "datasets/rajpurkar/squad"
-CUSTOM_DATA_DIR = "../datasets"
+SQUAD_DATA_DIR = "data/rajpurkar/squad"
+CUSTOM_DATA_DIR = "../data"
 OUTPUT_DIR = "./fine_tuned_model"
 CACHE_DIR = "../cache"
 
-# Load SQuAD datasets dynamically
+# Load SQuAD data dynamically
 
 def load_squad_datasets():
     try:
@@ -54,7 +57,7 @@ def load_custom_dataset(data):
                 })
     return Dataset.from_pandas(pd.DataFrame(flattened_data))
 
-# Combine datasets
+# Combine data
 def combine_datasets(custom_dataset, squad_dataset):
     combined_dataset = concatenate_datasets([custom_dataset, squad_dataset])
     return combined_dataset.train_test_split(test_size=0.2, seed=42)
@@ -119,7 +122,7 @@ def preprocess_data(examples, tokenizer):
         start_positions.append(start_token)
         end_positions.append(end_token)
 
-    # Convert tensors to lists to ensure compatibility with Hugging Face datasets
+    # Convert tensors to lists to ensure compatibility with Hugging Face data
     tokenized = {key: val.tolist() if isinstance(val, torch.Tensor) else val for key, val in tokenized.items()}
     tokenized.update({
         "start_positions": start_positions,
@@ -142,7 +145,7 @@ def load_or_preprocess_dataset(train_dataset, val_dataset, tokenizer, cache_dir=
             shutil.rmtree(val_cache_path)
 
     if os.path.exists(train_cache_path) and os.path.exists(val_cache_path) and not force_retokenize:
-        print("Loading cached datasets...")
+        print("Loading cached data...")
         tokenized_train_dataset = load_from_disk(train_cache_path)
         tokenized_val_dataset = load_from_disk(val_cache_path)
     else:
@@ -348,7 +351,7 @@ if __name__ == "__main__":
 }
     metric = evaluate.load("squad")
 
-    print("Loading datasets...")
+    print("Loading data...")
     custom_dataset = load_custom_dataset(datasets)
     squad_train, squad_val = load_squad_datasets()
 
