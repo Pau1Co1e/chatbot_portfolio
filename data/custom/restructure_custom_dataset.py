@@ -14,11 +14,14 @@ def restructure_custom_dataset(input_json, output_parquet):
         with open(input_json, "r") as f:
             data = json.load(f)
 
-        # Flatten the dataset
+        # Flatten the dataset and add unique IDs
         records = []
+        unique_id = 0
         for category, entries in data.items():
             for entry in entries:
                 records.append({
+                    "id": f"{category}-{unique_id}",  # Generate a unique ID
+                    "title": category.capitalize(),  # Use category as title
                     "context": entry["context"],
                     "question": entry["question"],
                     "answers": {
@@ -26,6 +29,7 @@ def restructure_custom_dataset(input_json, output_parquet):
                         "answer_start": entry["answers"]["answer_start"]
                     }
                 })
+                unique_id += 1
 
         # Convert to a DataFrame
         df = pd.DataFrame(records)

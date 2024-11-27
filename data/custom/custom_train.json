@@ -1,5 +1,5 @@
 {
-    "education_and_certifications": [
+    "education": [
         {
             "question": "What is your educational background?",
             "context": "Paul Coleman holds a Master of Science in Computer Science from Utah Valley University (expected August 2025) and a Bachelor of Science in Computer Science (graduated August 2022) with a GPA of 3.26.",
@@ -7,7 +7,9 @@
                 "text": ["Master of Science in Computer Science from Utah Valley University", "Bachelor of Science in Computer Science"],
                 "answer_start": [19, 110]
             }
-        },
+        }
+    ],
+    "certificates": [
         {
             "question": "What certifications do you have?",
             "context": "Paul Coleman has a Programmer Certification from Utah Valley University (2020), was on the Dean's List in 2020 and 2021, and holds a CompTIA A+ Certification from Dell Inc.",
@@ -47,7 +49,7 @@
             }
         }
     ],
-    "ai_concepts": [
+    "interpretable": [
         {
             "question": "How has Paul applied Interpretable Machine Learning in projects?",
             "context": "Paul Coleman has experience with Interpretable Machine Learning techniques like LIME and SHAP. He has applied these methods to financial prediction models to explain outputs to stakeholders in the FinTech industry.",
@@ -55,15 +57,23 @@
                 "text": ["Interpretable Machine Learning techniques like LIME and SHAP"],
                 "answer_start": [42]
             }
-        },
+        }
+        ],
+    "transfer_learning": [
         {
             "question": "What are Paul’s contributions to Transfer Learning?",
             "context": "Paul has implemented Transfer Learning in NLP applications, utilizing pre-trained language models such as BERT for sentiment analysis and chatbots. He optimized transfer learning workflows for rapid deployment in AI systems.",
             "answers": {
-                "text": ["Transfer Learning in NLP applications"],
-                "answer_start": [24]
+                "text": [
+                    "Transfer Learning in NLP applications"
+                ],
+                "answer_start": [
+                    24
+                ]
             }
-        },
+        }
+    ],
+    "reinforcement_learning": [
         {
             "question": "What is Paul’s experience with Reinforcement Learning?",
             "context": "Paul worked on Reinforcement Learning algorithms for autonomous mobile robots during his time at Utah Valley University. He focused on developing agents capable of decision-making in dynamic environments using Q-Learning and Deep Q-Networks.",
@@ -71,7 +81,9 @@
                 "text": ["Reinforcement Learning algorithms for autonomous mobile robots"],
                 "answer_start": [17]
             }
-        },
+        }
+    ],
+    "natural_language_processing": [
         {
             "question": "How has Paul leveraged NLP in his projects?",
             "context": "Paul specializes in Natural Language Processing, having developed conversational AI systems using Transformer-based models like GPT. His projects include chatbots for customer support and advanced text summarization tools.",
@@ -79,15 +91,19 @@
                 "text": ["Natural Language Processing"],
                 "answer_start": [17]
             }
-        },
-        {
-            "question": "What role has Anomaly Detection played in Paul’s work?",
-            "context": "Paul implemented Anomaly Detection techniques in cybersecurity applications to identify fraud and unusual network behavior. He used autoencoders and statistical methods to improve system reliability.",
-            "answers": {
-                "text": ["Anomaly Detection techniques in cybersecurity applications"],
-                "answer_start": [17]
+        }
+        ],
+    "anomaly_detection":  [
+            {
+                "question": "What role has Anomaly Detection played in Paul’s work?",
+                "context": "Paul implemented Anomaly Detection techniques in cybersecurity applications to identify fraud and unusual network behavior. He used autoencoders and statistical methods to improve system reliability.",
+                "answers": {
+                    "text": ["Anomaly Detection techniques in cybersecurity applications"],
+                    "answer_start": [17]
+                }
             }
-        },
+        ],
+    "time_series_analysis": [
         {
             "question": "How has Paul used Time Series Analysis?",
             "context": "Paul has applied Time Series Analysis in financial forecasting, developing models to predict stock price movements and economic trends. He has experience using ARIMA, LSTM networks, and seasonal decomposition techniques.",
@@ -95,7 +111,9 @@
               "text": ["Time Series Analysis in financial forecasting"],
               "answer_start": [17]
             }
-        },
+        }
+    ],
+    "computer_vision":[
         {
             "question": "What is Paul’s expertise in Computer Vision?",
             "context": "Paul has developed Computer Vision models for object detection and image segmentation. His projects include building a vision-based quality inspection system for manufacturing and applying OpenCV and TensorFlow for object tracking.",
@@ -103,7 +121,9 @@
                 "text": ["Computer Vision models for object detection and image segmentation"],
                 "answer_start": [17]
             }
-        },
+        }
+    ],
+    "neural_nets":[
         {
             "question": "What types of Neural Networks has Paul worked with?",
             "context": "Paul has worked extensively with convolutional neural networks (CNNs) for image analysis and recurrent neural networks (RNNs) for sequential data. His expertise includes designing custom architectures for real-world applications.",
@@ -111,7 +131,9 @@
                 "text": ["convolutional neural networks (CNNs) for image analysis"],
                 "answer_start": [35]
             }
-        },
+        }
+    ],
+    "autonomous_robots":[
         {
             "question": "What is Paul’s experience with Autonomous Mobile Robots?",
             "context": "Paul led a project on Autonomous Mobile Robots at UVU, focusing on navigation and decision-making using reinforcement learning and sensor fusion techniques. He optimized the robots for warehouse management tasks.",
@@ -119,7 +141,9 @@
                 "text": ["Autonomous Mobile Robots at UVU"],
                 "answer_start": [26]
             }
-        },
+        }
+    ],
+    "conversational_ai":[
         {
             "question": "What are Paul’s accomplishments in Conversational AI?",
             "context": "Paul developed a portfolio chatbot using a custom-trained DistilBERT model integrated with Flask. He also worked on multi-turn dialogue systems for virtual assistants in customer support domains.",
