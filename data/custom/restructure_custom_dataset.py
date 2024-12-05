@@ -44,7 +44,7 @@ def restructure_custom_dataset(input_json, output_parquet):
 
 
 # Example usage
-input_json = "custom_train.json"  # Path to your input JSON
+input_json = "custom_train.json"  # Path input JSON
 output_parquet = "custom_train_restructured.parquet"  # Desired output Parquet path
 
 restructure_custom_dataset(input_json, output_parquet)

@@ -9,7 +9,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 
-class EDM:
+
+class EDA:
     def __init__(self, dataset_directory, model_name):
         self.dataset_directory = dataset_directory
         self.model_name = model_name
@@ -113,9 +114,6 @@ class EDM:
         print(f"Attention Mask: {tokenized_output['attention_mask']}")
         return tokenized_output
 
-    from datasets import DatasetDict
-
-    from datasets import DatasetDict
 
     def load_datasets(self):
         # Paths
@@ -175,32 +173,65 @@ class EDM:
         return Dataset.from_pandas(pd.DataFrame(flattened_data))
 
     def preprocess_datasets(self):
-        def tokenize_function(examples):
-            return self.tokenizer(
+        """
+        Tokenize and preprocess datasets, then convert them to Pandas DataFrames.
+        """
+
+        def tokenize_and_align_labels(examples):
+            # Tokenize question and context
+            tokenized_inputs = self.tokenizer(
                 examples["question"],
                 examples["context"],
                 truncation=True,
                 padding="max_length",
                 max_length=512,
+                return_tensors="pt",
             )
 
-        self.datasets = self.datasets.map(tokenize_function, batched=True)
-        print("Datasets tokenized successfully.")
+            # Initialize start and end positions
+            start_positions = []
+            end_positions = []
+
+            # Align tokenized inputs with answer spans
+            for i, answer in enumerate(examples["answers"]):
+                if len(answer["answer_start"]) == 0:  # No answer
+                    start_positions.append(0)
+                    end_positions.append(0)
+                else:
+                    start_char = answer["answer_start"][0]
+                    end_char = start_char + len(answer["text"][0])
+
+                    # Map character positions to token positions
+                    token_start = tokenized_inputs.char_to_token(i, start_char)
+                    token_end = tokenized_inputs.char_to_token(i, end_char - 1)
+
+                    # Handle cases where mapping fails
+                    if token_start is None:
+                        token_start = self.tokenizer.model_max_length
+                    if token_end is None:
+                        token_end = self.tokenizer.model_max_length
+
+                    start_positions.append(token_start)
+                    end_positions.append(token_end)
+
+            tokenized_inputs["start_positions"] = start_positions
+            tokenized_inputs["end_positions"] = end_positions
+            return tokenized_inputs
+
+        print("Starting tokenization with label alignment...")
+        self.datasets = self.datasets.map(tokenize_and_align_labels, batched=True)
+        print("Datasets tokenized and aligned successfully.")
 
         self.datasets.set_format(type="pandas")
-        self.df_train = self.datasets["train"].to_pandas()
-        self.df_validate = self.datasets["validate"].to_pandas()
-        self.df_custom = self.datasets["custom"].to_pandas()
-        print("Datasets converted to DataFrames.")
 
-        # Handle missing columns in the custom dataset
-        if "id" not in self.df_custom.columns:
-            self.df_custom["id"] = "custom-id-placeholder"
-
-        if "title" not in self.df_custom.columns:
-            self.df_custom["title"] = "custom-title-placeholder"
-
-        print("Missing columns handled in 'custom' dataset.")
+        # Convert splits to DataFrames
+        try:
+            self.df_train = self.datasets["train"].to_pandas()
+            self.df_validate = self.datasets["validate"].to_pandas()
+            self.df_custom = self.datasets["custom"].to_pandas()
+            print("Datasets converted to DataFrames.")
+        except KeyError as e:
+            raise RuntimeError(f"Error converting datasets to DataFrames: {e}")
 
     def inspect_data(self):
         """Print sample rows from datasets for inspection."""
@@ -221,28 +252,17 @@ class EDM:
         # Preprocess datasets
         self.preprocess_datasets()
 
+        # Verify DataFrame conversion
+        if self.df_train is None or self.df_validate is None or self.df_custom is None:
+            raise RuntimeError("One or more DataFrames are not properly initialized after preprocessing.")
+
         # Check for null values
         self.check_null_values(self.df_train, "Train DataFrame")
         self.check_null_values(self.df_validate, "Validation DataFrame")
         self.check_null_values(self.df_custom, "Custom DataFrame")
 
-        # Handle missing values in the custom dataset
-        self.df_custom["id"] = self.df_custom["id"].fillna("custom-id-placeholder")
-        self.df_custom["title"] = self.df_custom["title"].fillna("custom-title-placeholder")
-
-        # Plot question type frequencies
-        question_types = ["What", "How", "Is", "Does", "Do", "Was", "Where", "Why"]
-        self.plot_question_type_frequency(self.df_train, question_types)
-
-        # Select a random question of type "What"
-        self.random_question_by_type("What")
-
-        # Select and tokenize a random question-context pair
-        question, context = self.random_question_context_pair()
-        self.tokenize_and_inspect(question, context)
-
-        # Save tokenized datasets
-        self.save_datasets()
+        # Additional processing or analysis steps
+        print("Pipeline executed successfully.")
 
     @staticmethod
     def plot_question_type_frequency(df, question_types):
