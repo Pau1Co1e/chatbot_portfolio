@@ -1,6 +1,7 @@
 safetensors==0.4.5
 tqdm~=4.67.1
-fastapi-cache==0.1.0
+# fastapi-cache==0.1.0
+# fastapi-cache2==0.2.8
 fastapi==0.95.1
 # fastapi==0.115.5
 uvicorn==0.32.1
@@ -14,6 +15,6 @@ accelerate==1.1.1
 pandas==2.2.3
 numpy==1.26.4
 matplotlib==3.9.2
-redis==5.2.0
+# redis==5.2.0
 pyarrow~=18.1.0
 sentence-transformers==3.3.1
