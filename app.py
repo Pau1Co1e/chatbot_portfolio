@@ -45,38 +45,22 @@ class ModelManager:
         self.lock = asyncio.Lock()
         self.pipeline = None
 
-#     async def load_model(self):
-#         async with self.lock:
-#             if self.pipeline is None:
-#                 try:
-#                     self.pipeline = pipeline(
-#                         "question-answering",
-#                         model="distilbert-base-cased-distilled-squad",
-#                         device=-1  # CPU only
-#                     )
-#                     logger.info(f"Model loaded on CPU")
-#                 except Exception as e:
-#                     logger.error(f"Failed to load the model: {e}")
-#                     raise
     async def load_model(self):
         async with self.lock:
             if self.pipeline is None:
                 try:
-                    # Replace "distilbert-base-cased-distilled-squad" with your model's path
                     device = get_device()
-                    # Log the selected device for debugging
-                    print(f"Using device: {device}")
-                    model_path = "/opt/render/models/"
+                    model_path = "/opt/render/models/fine_tuned_model"  # Updated path
 
                     self.pipeline = pipeline(
                         "question-answering",
                         model=model_path,
+                        tokenizer=model_path,
                         device=0 if device.type != "cpu" else -1
                     )
-
-                    logger.info(f"Custom model loaded from {model_path} on CPU")
+                    logger.info(f"Custom model loaded from {model_path} on {device}")
                 except Exception as e:
-                    logger.error(f"Failed to load the custom model: {e}")
+                    logger.error(f"Failed to load the custom model. Device: {device}. Path: {model_path}. Error: {e}")
                     raise
 
 
@@ -148,6 +132,7 @@ async def call_faq_pipeline(faq_request: FAQRequest):
 
         # Run model inference
         loop = asyncio.get_event_loop()
+        # result = await asyncio.to_thread(self.pipeline, inputs)
         result = await loop.run_in_executor(None, model_manager.pipeline, inputs)
 
         if "answer" not in result:
@@ -195,9 +180,11 @@ async def get_projects_response():
                   "expertise in machine learning, mathematics, and practical AI applications."
     }
 
-@app.get("/")
+@app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {"status": "healthy",
+            "model_loaded": model_manager.pipeline is not None
+            }
 
 def get_device():
     # Check for GPU (CUDA)
