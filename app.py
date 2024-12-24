@@ -66,7 +66,7 @@ class ModelManager:
                     device = get_device()
                     # Log the selected device for debugging
                     print(f"Using device: {device}")
-                    model_path = "/opt/render/models/paul_chatbot_model.safetensors"
+                    model_path = "/opt/render/models/"
 
                     self.pipeline = pipeline(
                         "question-answering",
