@@ -58,26 +58,26 @@ class ModelManager:
 #                 except Exception as e:
 #                     logger.error(f"Failed to load the model: {e}")
 #                     raise
-async def load_model(self):
-    async with self.lock:
-        if self.pipeline is None:
-            try:
-                # Replace "distilbert-base-cased-distilled-squad" with your model's path
-                device = get_device()
-                # Log the selected device for debugging
-                print(f"Using device: {device}")
-                model_path = "/opt/render/models/paul_chatbot_model.safetensors"
+    async def load_model(self):
+        async with self.lock:
+            if self.pipeline is None:
+                try:
+                    # Replace "distilbert-base-cased-distilled-squad" with your model's path
+                    device = get_device()
+                    # Log the selected device for debugging
+                    print(f"Using device: {device}")
+                    model_path = "/opt/render/models/paul_chatbot_model.safetensors"
 
-                self.pipeline = pipeline(
-                    "question-answering",
-                    model=model_path,
-                    device=0 if device.type != "cpu" else -1
-                )
+                    self.pipeline = pipeline(
+                        "question-answering",
+                        model=model_path,
+                        device=0 if device.type != "cpu" else -1
+                    )
 
-                logger.info(f"Custom model loaded from {model_path} on CPU")
-            except Exception as e:
-                logger.error(f"Failed to load the custom model: {e}")
-                raise
+                    logger.info(f"Custom model loaded from {model_path} on CPU")
+                except Exception as e:
+                    logger.error(f"Failed to load the custom model: {e}")
+                    raise
 
 
 model_manager = ModelManager()
