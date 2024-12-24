@@ -7,9 +7,11 @@ from transformers import pipeline
 import os
 import re
 import asyncio
-from fastapi_cache import FastAPICache
-from fastapi_cache.backends.redis import RedisBackend
-from redis.asyncio.client import Redis
+# from fastapi_cache2 import FastAPICache
+# from fastapi_cache2.backends.redis import RedisBackend
+# from fastapi_cache import FastAPICache
+# from fastapi_cache.backends.redis import RedisBackend
+# from redis.asyncio.client import Redis
 from fastapi_cache.decorator import cache
 from pydantic import ValidationError
 
