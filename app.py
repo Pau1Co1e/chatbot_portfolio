@@ -43,19 +43,39 @@ class ModelManager:
         self.lock = asyncio.Lock()
         self.pipeline = None
 
-    async def load_model(self):
-        async with self.lock:
-            if self.pipeline is None:
-                try:
-                    self.pipeline = pipeline(
-                        "question-answering",
-                        model="distilbert-base-cased-distilled-squad",
-                        device=-1  # CPU only
-                    )
-                    logger.info(f"Model loaded on CPU")
-                except Exception as e:
-                    logger.error(f"Failed to load the model: {e}")
-                    raise
+#     async def load_model(self):
+#         async with self.lock:
+#             if self.pipeline is None:
+#                 try:
+#                     self.pipeline = pipeline(
+#                         "question-answering",
+#                         model="distilbert-base-cased-distilled-squad",
+#                         device=-1  # CPU only
+#                     )
+#                     logger.info(f"Model loaded on CPU")
+#                 except Exception as e:
+#                     logger.error(f"Failed to load the model: {e}")
+#                     raise
+async def load_model(self):
+    async with self.lock:
+        if self.pipeline is None:
+            try:
+                # Replace "distilbert-base-cased-distilled-squad" with your model's path
+                device = get_device()
+                # Log the selected device for debugging
+                print(f"Using device: {device}")
+                model_path = "/opt/render/models/paul_chatbot_model.safetensors"
+
+                self.pipeline = pipeline(
+                    "question-answering",
+                    model=model_path,
+                    device=0 if device.type != "cpu" else -1
+                )
+
+                logger.info(f"Custom model loaded from {model_path} on CPU")
+            except Exception as e:
+                logger.error(f"Failed to load the custom model: {e}")
+                raise
 
 
 model_manager = ModelManager()
@@ -176,3 +196,14 @@ async def get_projects_response():
 @app.get("/")
 async def health_check():
     return {"status": "healthy"}
+
+def get_device():
+    # Check for GPU (CUDA)
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    # Check for Metal (macOS GPU support)
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
+    # Default to CPU if no GPU is available
+    else:
+        return torch.device("cpu")
