@@ -176,7 +176,7 @@ async def get_education_response():
 async def get_projects_response():
     return {
         "answer": "Some of my notable projects include a fractal dimension calculator, a stock market analysis predictor, "
-                  "and a chatbot application integrated into my personal portfolio website. These projects highlight my "
+                  "and an AI chatbot application integrated into my personal portfolio website. These projects highlight my "
                   "expertise in machine learning, mathematics, and practical AI applications."
     }
 

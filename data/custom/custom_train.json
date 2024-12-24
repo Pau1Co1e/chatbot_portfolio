@@ -1,156 +1,152 @@
-{
-    "education": [
-        {
-            "question": "What is your educational background?",
-            "context": "Paul Coleman holds a Master of Science in Computer Science from Utah Valley University (expected August 2025) and a Bachelor of Science in Computer Science (graduated August 2022) with a GPA of 3.26.",
-            "answers": {
-                "text": ["Master of Science in Computer Science from Utah Valley University", "Bachelor of Science in Computer Science"],
-                "answer_start": [19, 110]
-            }
-        }
-    ],
-    "certificates": [
-        {
-            "question": "What certifications do you have?",
-            "context": "Paul Coleman has a Programmer Certification from Utah Valley University (2020), was on the Dean's List in 2020 and 2021, and holds a CompTIA A+ Certification from Dell Inc.",
-            "answers": {
-                "text": ["Programmer Certification", "CompTIA A+ Certification"],
-                "answer_start": [19, 120]
-            }
-        }
-    ],
-    "professional_skills": [
-        {
-            "question": "What are your professional skills?",
-            "context": "Paul Coleman is skilled in AI & Machine Learning, model development, algorithm design, NLP, web development with Flask and JavaScript, and scalable systems design. His programming expertise includes Python, C#, and Java.",
-            "answers": {
-                "text": ["AI & Machine Learning", "Flask and JavaScript", "Python, C#, and Java"],
-                "answer_start": [19, 80, 147]
-            }
-        }
-    ],
-    "work_experience": [
-        {
-            "question": "Where have you worked recently?",
-            "context": "Paul Coleman worked as a Full Stack Software Engineer at ResNexus from September 2023 to December 2023. He developed backend APIs and frontend components using the Microsoft tech stack for hotel and rental management products.",
-            "answers": {
-                "text": ["Full Stack Software Engineer at ResNexus"],
-                "answer_start": [18]
-            }
-        }
-    ],
-    "volunteer_experience": [
-        {
-            "question": "What volunteer experience do you have?",
-            "context": "Paul Coleman organized a local donation event for the Northern Utah Habitat for Humanity Clothing Drive in June 2014, supporting children and families in the Dominican Republic.",
-            "answers": {
-                "text": ["Northern Utah Habitat for Humanity Clothing Drive"],
-                "answer_start": [34]
-            }
-        }
-    ],
-    "interpretable": [
-        {
-            "question": "How has Paul applied Interpretable Machine Learning in projects?",
-            "context": "Paul Coleman has experience with Interpretable Machine Learning techniques like LIME and SHAP. He has applied these methods to financial prediction models to explain outputs to stakeholders in the FinTech industry.",
-            "answers": {
-                "text": ["Interpretable Machine Learning techniques like LIME and SHAP"],
-                "answer_start": [42]
-            }
-        }
-        ],
-    "transfer_learning": [
-        {
-            "question": "What are Paul’s contributions to Transfer Learning?",
-            "context": "Paul has implemented Transfer Learning in NLP applications, utilizing pre-trained language models such as BERT for sentiment analysis and chatbots. He optimized transfer learning workflows for rapid deployment in AI systems.",
-            "answers": {
-                "text": [
-                    "Transfer Learning in NLP applications"
-                ],
-                "answer_start": [
-                    24
-                ]
-            }
-        }
-    ],
-    "reinforcement_learning": [
-        {
-            "question": "What is Paul’s experience with Reinforcement Learning?",
-            "context": "Paul worked on Reinforcement Learning algorithms for autonomous mobile robots during his time at Utah Valley University. He focused on developing agents capable of decision-making in dynamic environments using Q-Learning and Deep Q-Networks.",
-            "answers": {
-                "text": ["Reinforcement Learning algorithms for autonomous mobile robots"],
-                "answer_start": [17]
-            }
-        }
-    ],
-    "natural_language_processing": [
-        {
-            "question": "How has Paul leveraged NLP in his projects?",
-            "context": "Paul specializes in Natural Language Processing, having developed conversational AI systems using Transformer-based models like GPT. His projects include chatbots for customer support and advanced text summarization tools.",
-            "answers": {
-                "text": ["Natural Language Processing"],
-                "answer_start": [17]
-            }
-        }
-        ],
-    "anomaly_detection":  [
-            {
-                "question": "What role has Anomaly Detection played in Paul’s work?",
-                "context": "Paul implemented Anomaly Detection techniques in cybersecurity applications to identify fraud and unusual network behavior. He used autoencoders and statistical methods to improve system reliability.",
-                "answers": {
-                    "text": ["Anomaly Detection techniques in cybersecurity applications"],
-                    "answer_start": [17]
-                }
-            }
-        ],
-    "time_series_analysis": [
-        {
-            "question": "How has Paul used Time Series Analysis?",
-            "context": "Paul has applied Time Series Analysis in financial forecasting, developing models to predict stock price movements and economic trends. He has experience using ARIMA, LSTM networks, and seasonal decomposition techniques.",
-            "answers": {
-              "text": ["Time Series Analysis in financial forecasting"],
-              "answer_start": [17]
-            }
-        }
-    ],
-    "computer_vision":[
-        {
-            "question": "What is Paul’s expertise in Computer Vision?",
-            "context": "Paul has developed Computer Vision models for object detection and image segmentation. His projects include building a vision-based quality inspection system for manufacturing and applying OpenCV and TensorFlow for object tracking.",
-            "answers": {
-                "text": ["Computer Vision models for object detection and image segmentation"],
-                "answer_start": [17]
-            }
-        }
-    ],
-    "neural_nets":[
-        {
-            "question": "What types of Neural Networks has Paul worked with?",
-            "context": "Paul has worked extensively with convolutional neural networks (CNNs) for image analysis and recurrent neural networks (RNNs) for sequential data. His expertise includes designing custom architectures for real-world applications.",
-            "answers": {
-                "text": ["convolutional neural networks (CNNs) for image analysis"],
-                "answer_start": [35]
-            }
-        }
-    ],
-    "autonomous_robots":[
-        {
-            "question": "What is Paul’s experience with Autonomous Mobile Robots?",
-            "context": "Paul led a project on Autonomous Mobile Robots at UVU, focusing on navigation and decision-making using reinforcement learning and sensor fusion techniques. He optimized the robots for warehouse management tasks.",
-            "answers": {
-                "text": ["Autonomous Mobile Robots at UVU"],
-                "answer_start": [26]
-            }
-        }
-    ],
-    "conversational_ai":[
-        {
-            "question": "What are Paul’s accomplishments in Conversational AI?",
-            "context": "Paul developed a portfolio chatbot using a custom-trained DistilBERT model integrated with Flask. He also worked on multi-turn dialogue systems for virtual assistants in customer support domains.",
-            "answers": {
-                "text": ["a portfolio chatbot using a custom-trained DistilBERT model"],
-                "answer_start": [17]
-            }
-        }
-    ]
-}
+[
+  {
+    "id": "education-0",
+    "title": "Education",
+    "context": "Paul Coleman holds a Master of Science in Computer Science from Utah Valley University (expected August 2025) and a Bachelor of Science in Computer Science (graduated August 2022) with a GPA of 3.26.",
+    "question": "What is your educational background?",
+    "answers": {
+      "text": ["Master of Science in Computer Science from Utah Valley University", "Bachelor of Science in Computer Science"],
+      "answer_start": [19, 110]
+    }
+  },
+  {
+    "id": "certificates-0",
+    "title": "Certificates",
+    "context": "Paul Coleman has a Programmer Certification from Utah Valley University (2020), was on the Dean's List in 2020 and 2021, and holds a CompTIA A+ Certification from Dell Inc.",
+    "question": "What certifications do you have?",
+    "answers": {
+      "text": ["Programmer Certification", "CompTIA A+ Certification"],
+      "answer_start": [19, 120]
+    }
+  },
+  {
+    "id": "skills-0",
+    "title": "Professional Skills",
+    "context": "Paul Coleman is skilled in AI & Machine Learning, model development, algorithm design, NLP, web development with Flask and JavaScript, and scalable systems design. His programming expertise includes Python, C#, and Java.",
+    "question": "What are your professional skills?",
+    "answers": {
+      "text": ["AI & Machine Learning", "Flask and JavaScript", "Python, C#, and Java"],
+      "answer_start": [19, 80, 147]
+    }
+  },
+  {
+    "id": "work-0",
+    "title": "Work Experience",
+    "context": "Paul Coleman worked as a Full Stack Software Engineer at ResNexus from September 2023 to December 2023. He developed backend APIs and frontend components using the Microsoft tech stack for hotel and rental management products.",
+    "question": "Where have you worked recently?",
+    "answers": {
+      "text": ["Full Stack Software Engineer at ResNexus"],
+      "answer_start": [18]
+    }
+  },
+  {
+    "id": "volunteer-0",
+    "title": "Volunteer Experience",
+    "context": "Paul Coleman organized a local donation event for the Northern Utah Habitat for Humanity Clothing Drive in June 2014, supporting children and families in the Dominican Republic.",
+    "question": "What volunteer experience do you have?",
+    "answers": {
+      "text": ["Northern Utah Habitat for Humanity Clothing Drive"],
+      "answer_start": [34]
+    }
+  },
+  {
+    "id": "interpretable-0",
+    "title": "Interpretable ML",
+    "context": "Paul Coleman has experience with Interpretable Machine Learning techniques like LIME and SHAP. He has applied these methods to financial prediction models to explain outputs to stakeholders in the FinTech industry.",
+    "question": "How has Paul applied Interpretable Machine Learning in projects?",
+    "answers": {
+      "text": ["Interpretable Machine Learning techniques like LIME and SHAP"],
+      "answer_start": [42]
+    }
+  },
+  {
+    "id": "transfer-0",
+    "title": "Transfer Learning",
+    "context": "Paul has implemented Transfer Learning in NLP applications, utilizing pre-trained language models such as BERT for sentiment analysis and chatbots. He optimized transfer learning workflows for rapid deployment in AI systems.",
+    "question": "What are Paul’s contributions to Transfer Learning?",
+    "answers": {
+      "text": ["Transfer Learning in NLP applications"],
+      "answer_start": [24]
+    }
+  },
+  {
+    "id": "rl-0",
+    "title": "Reinforcement Learning",
+    "context": "Paul worked on Reinforcement Learning algorithms for autonomous mobile robots during his time at Utah Valley University. He focused on developing agents capable of decision-making in dynamic environments using Q-Learning and Deep Q-Networks.",
+    "question": "What is Paul’s experience with Reinforcement Learning?",
+    "answers": {
+      "text": ["Reinforcement Learning algorithms for autonomous mobile robots"],
+      "answer_start": [17]
+    }
+  },
+  {
+    "id": "nlp-0",
+    "title": "Natural Language Processing",
+    "context": "Paul specializes in Natural Language Processing, having developed conversational AI systems using Transformer-based models like GPT. His projects include chatbots for customer support and advanced text summarization tools.",
+    "question": "How has Paul leveraged NLP in his projects?",
+    "answers": {
+      "text": ["Natural Language Processing"],
+      "answer_start": [17]
+    }
+  },
+  {
+    "id": "anomaly-0",
+    "title": "Anomaly Detection",
+    "context": "Paul implemented Anomaly Detection techniques in cybersecurity applications to identify fraud and unusual network behavior. He used autoencoders and statistical methods to improve system reliability.",
+    "question": "What role has Anomaly Detection played in Paul’s work?",
+    "answers": {
+      "text": ["Anomaly Detection techniques in cybersecurity applications"],
+      "answer_start": [17]
+    }
+  },
+  {
+    "id": "time-series-0",
+    "title": "Time Series Analysis",
+    "context": "Paul has applied Time Series Analysis in financial forecasting, developing models to predict stock price movements and economic trends. He has experience using ARIMA, LSTM networks, and seasonal decomposition techniques.",
+    "question": "How has Paul used Time Series Analysis?",
+    "answers": {
+      "text": ["Time Series Analysis in financial forecasting"],
+      "answer_start": [17]
+    }
+  },
+  {
+    "id": "cv-0",
+    "title": "Computer Vision",
+    "context": "Paul has developed Computer Vision models for object detection and image segmentation. His projects include building a vision-based quality inspection system for manufacturing and applying OpenCV and TensorFlow for object tracking.",
+    "question": "What is Paul’s expertise in Computer Vision?",
+    "answers": {
+      "text": ["Computer Vision models for object detection and image segmentation"],
+      "answer_start": [17]
+    }
+  },
+  {
+    "id": "nn-0",
+    "title": "Neural Networks",
+    "context": "Paul has worked extensively with convolutional neural networks (CNNs) for image analysis and recurrent neural networks (RNNs) for sequential data. His expertise includes designing custom architectures for real-world applications.",
+    "question": "What types of Neural Networks has Paul worked with?",
+    "answers": {
+      "text": ["convolutional neural networks (CNNs) for image analysis"],
+      "answer_start": [35]
+    }
+  },
+  {
+    "id": "robots-0",
+    "title": "Autonomous Robots",
+    "context": "Paul led a project on Autonomous Mobile Robots at UVU, focusing on navigation and decision-making using reinforcement learning and sensor fusion techniques. He optimized the robots for warehouse management tasks.",
+    "question": "What is Paul’s experience with Autonomous Mobile Robots?",
+    "answers": {
+      "text": ["Autonomous Mobile Robots at UVU"],
+      "answer_start": [26]
+    }
+  },
+  {
+    "id": "ai-0",
+    "title": "Conversational AI",
+    "context": "Paul developed a portfolio chatbot using a custom-trained DistilBERT model integrated with Flask. He also worked on multi-turn dialogue systems for virtual assistants in customer support domains.",
+    "question": "What are Paul’s accomplishments in Conversational AI?",
+    "answers": {
+      "text": ["a portfolio chatbot using a custom-trained DistilBERT model"],
+      "answer_start": [17]
+    }
+  }
+]
