@@ -12,7 +12,7 @@ import asyncio
 # from fastapi_cache import FastAPICache
 # from fastapi_cache.backends.redis import RedisBackend
 # from redis.asyncio.client import Redis
-from fastapi_cache.decorator import cache
+# from fastapi_cache.decorator import cache
 from pydantic import ValidationError
 
 # Environment Variables
@@ -109,7 +109,7 @@ def sanitize_text(text: str, max_length: int = 1000) -> str:
 
 
 @app.post("/faq/")
-@cache(expire=60)
+# @cache(expire=60)
 async def call_faq_pipeline(faq_request: FAQRequest):
     try:
         # Sanitize inputs
