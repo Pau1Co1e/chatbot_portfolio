@@ -9,7 +9,6 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 
-
 class EDA:
     def __init__(self, dataset_directory, model_name):
         self.dataset_directory = dataset_directory
@@ -113,7 +112,6 @@ class EDA:
         print(f"Input IDs: {tokenized_output['input_ids']}")
         print(f"Attention Mask: {tokenized_output['attention_mask']}")
         return tokenized_output
-
 
     def load_datasets(self):
         # Paths
@@ -294,4 +292,3 @@ class EDA:
 #         model_name="deepset/roberta-base-squad2"
 #     )
 #     edm.run_pipeline()
-
