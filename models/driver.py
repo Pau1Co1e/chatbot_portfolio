@@ -1,9 +1,17 @@
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering, TrainingArguments, Trainer, pipeline
+from transformers import (
+    AutoTokenizer,
+    AutoModelForQuestionAnswering,
+    TrainingArguments,
+    Trainer,
+    pipeline
+)
 from datasets import Dataset
-from eda import EDA
+from eda import EDA  # Assuming this is a custom EDA class
 import torch
 import pandas as pd
 import os
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Detect device
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
@@ -22,47 +30,53 @@ if "start_positions" not in edm.datasets["train"].column_names or "end_positions
     print("Tokenizing and aligning labels...")
     edm.preprocess_datasets()
 
-# Test: Select a random question and context
-question = edm.random_question_by_type("What")
-context = edm.df_train["context"].sample(n=1).iloc[0]
-print(f"Test Question: {question}")
-print(f"Test Context: {context}")
+# Exploratory Data Analysis
+def keyword_matching_analysis(df):
+    """Analyze keyword overlap between questions and contexts."""
+    df['keyword_overlap'] = df.apply(
+        lambda x: len(set(x['question'].lower().split()) & set(x['context'].lower().split())), axis=1
+    )
+    plt.figure(figsize=(10, 6))
+    df['keyword_overlap'].value_counts().sort_index().plot(kind='bar', color='skyblue', edgecolor='black')
+    plt.title("Keyword Overlap Between Questions and Contexts")
+    plt.xlabel("Number of Matching Keywords")
+    plt.ylabel("Frequency")
+    plt.show()
+    print("Keyword Matching Analysis Completed")
 
-# Exploratory Data Analysis: Plot question type frequency
-question_types = ["What", "How", "Is", "Does", "Do", "Was", "Where", "Why"]
-edm.plot_question_type_frequency(edm.df_train, question_types)
+def answerable_vs_unanswerable_analysis(df):
+    """Analyze the distribution of answerable vs. unanswerable questions."""
+    df['is_answerable'] = df['answers'].apply(lambda x: len(x["text"]) > 0 if "text" in x else False)
+    answerable_count = df['is_answerable'].value_counts()
+    plt.figure(figsize=(8, 6))
+    answerable_count.plot(kind='bar', color=['green', 'red'], alpha=0.7, edgecolor='black')
+    plt.title("Answerable vs. Unanswerable Questions")
+    plt.xlabel("Answerable (True) or Unanswerable (False)")
+    plt.ylabel("Count")
+    plt.xticks(ticks=[0, 1], labels=['Unanswerable', 'Answerable'], rotation=0)
+    plt.show()
+    print(f"Answerable Questions: {answerable_count.get(True, 0)}")
+    print(f"Unanswerable Questions: {answerable_count.get(False, 0)}")
 
-# Inspect a random question-context pair
-question, context = edm.random_question_context_pair()
-print(f"Inspecting Random Pair:\nQuestion: {question}\nContext: {context}")
-edm.tokenize_and_inspect(question, context)
-# Ensure custom dataset 'answers' schema is fixed
-custom_dataset_path = os.path.join(dataset_directory, "custom/custom_train_restructured.parquet")
-fixed_custom_dataset_path = os.path.join(dataset_directory, "custom/custom_train_restructured_fixed.parquet")
+def correlation_analysis(df):
+    """Plot the correlation matrix of numerical features."""
+    df["answer_length"] = df["answers"].apply(lambda x: len(x["text"][0]) if "text" in x and len(x["text"]) > 0 else 0)
+    numerical_features = ["answer_length", "start_positions", "end_positions"]
+    correlation_matrix = df[numerical_features].corr()
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap="coolwarm", cbar=True)
+    plt.title("Correlation Matrix of Numerical Features")
+    plt.show()
 
-if not os.path.exists(fixed_custom_dataset_path):
-    print("Fixing 'answers' schema for custom dataset...")
-    df_custom = pd.read_parquet(custom_dataset_path)
+# Run EDA analyses
+print("Performing Keyword Matching Analysis...")
+keyword_matching_analysis(edm.df_train)
 
-    # Ensure 'answers' column exists and apply schema fix
-    if "answers" not in df_custom.columns:
-        df_custom["answers"] = [{}] * len(df_custom)
+print("Analyzing Answerable vs. Unanswerable Questions...")
+answerable_vs_unanswerable_analysis(edm.df_train)
 
-    def fix_answers_schema(row):
-        """Ensure 'answers' column aligns with Hugging Face schema."""
-        if not isinstance(row, dict):
-            return {"text": [], "answer_start": []}
-        answers = row.get("answers", {})
-        if not isinstance(answers, dict):
-            return {"text": [], "answer_start": []}
-        return {
-            "text": answers.get("text", []),
-            "answer_start": answers.get("answer_start", []),
-        }
-
-    df_custom["answers"] = df_custom["answers"].apply(fix_answers_schema)
-    df_custom.to_parquet(fixed_custom_dataset_path, index=False)
-    print("Fixed 'answers' schema and saved the DataFrame.")
+print("Performing Correlation Analysis...")
+correlation_analysis(edm.df_train)
 
 # Split datasets for training and validation
 train_size = int(0.8 * len(edm.datasets["train"]))
@@ -71,19 +85,22 @@ tokenized_val = edm.datasets["train"].select(range(train_size, len(edm.datasets[
 
 # Load the model
 model = AutoModelForQuestionAnswering.from_pretrained(model_name).to(device)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 # Define training arguments
 training_args = TrainingArguments(
     output_dir="./results",
     evaluation_strategy="epoch",
     learning_rate=3e-5,
-    per_device_train_batch_size=8,
-    per_device_eval_batch_size=8,
+    per_device_train_batch_size=4,  # Reduced for memory optimization
+    per_device_eval_batch_size=4,  # Reduced for memory optimization
     num_train_epochs=3,
     weight_decay=0.01,
     logging_dir="./logs",
     save_total_limit=2,
     logging_steps=500,
+    fp16=torch.cuda.is_available(),  # Mixed precision if CUDA is available
+    gradient_accumulation_steps=2,  # Simulate larger batch sizes
 )
 
 # Initialize the Trainer
@@ -92,7 +109,7 @@ trainer = Trainer(
     args=training_args,
     train_dataset=tokenized_train,
     eval_dataset=tokenized_val,
-    tokenizer=edm.tokenizer,
+    tokenizer=tokenizer,
 )
 
 # Train the model
@@ -106,10 +123,12 @@ print(f"Evaluation Results: {evaluation_metrics}")
 
 # Save the fine-tuned model
 model.save_pretrained("./fine_tuned_model")
-edm.tokenizer.save_pretrained("./fine_tuned_model")
+tokenizer.save_pretrained("./fine_tuned_model")
 print("Fine-tuned model and tokenizer saved successfully.")
 
 # Test the model with a QA pipeline
-qa_pipeline = pipeline("question-answering", model=model, tokenizer=edm.tokenizer)
-result = qa_pipeline(question=question, context=context)
+qa_pipeline = pipeline("question-answering", model=model, tokenizer=tokenizer)
+test_question = "What is your name?"
+test_context = "My name is Paul Coleman."
+result = qa_pipeline(question=test_question, context=test_context)
 print(f"Test Answer: {result['answer']}")
