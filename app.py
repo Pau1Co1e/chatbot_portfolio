@@ -51,16 +51,19 @@ class ModelManager:
                 try:
                     device = get_device()
                     model_path = "/opt/render/models/fine_tuned_albert"
-
+                    model_path = "/Users/paulcoleman/Documents/PersonalCode/chatbot_portfolio/models/fine_tuned_albert"
                     tokenizer = AlbertTokenizerFast.from_pretrained(model_path)  # Ensure tokenizer compatibility
                     model = AutoModelForQuestionAnswering.from_pretrained(model_path)
 
                     self.pipeline = pipeline(
                         "question-answering",
-                        model=model,
-                        tokenizer=tokenizer,
-                        device=0 if device.type != "cpu" else -1
+                        model=model_path,
+                        tokenizer=model_path,
+                        device=device
                     )
+                    logger.info(f"Model loaded on device: {next(model.parameters()).device}")
+                    logger.info(f"Model config: {model.config}")
+                    logger.info(f"Tokenizer vocab size: {tokenizer.vocab_size}")
                     logger.info(f"Custom model and tokenizer loaded from {model_path} on {device}")
                 except Exception as e:
                     logger.error(f"Failed to load model or tokenizer. Error: {e}")
@@ -74,18 +77,10 @@ model_manager = ModelManager()
 async def startup_event():
     await model_manager.load_model()
 
-    # # Redis setup for caching, ensuring it expects byte responses
-    # redis = Redis.from_url("redis://red-cror6njqf0us73eeqr0g:6379", decode_responses=False)
-    #
-    # # Initialize FastAPI cache with Redis backend
-    # FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
-
-
 # Pydantic Model for FAQ Request
 class FAQRequest(BaseModel):
     question: str = Field(..., max_length=200)
     context: str = Field(..., max_length=1000)
-
 
 # Helper function for sanitization
 def sanitize_text(text: str, max_length: int = 1000) -> str:
@@ -94,81 +89,57 @@ def sanitize_text(text: str, max_length: int = 1000) -> str:
         sanitized = sanitized[:max_length]
     return sanitized
 
-
 @app.post("/faq/")
-# @cache(expire=60)
 async def call_faq_pipeline(faq_request: FAQRequest):
     try:
         # Sanitize inputs
         sanitized_question = sanitize_text(faq_request.question, max_length=200)
         sanitized_context = sanitize_text(faq_request.context, max_length=1000)
 
+        # Validate inputs
+        if not sanitized_question or not sanitized_context:
+            raise HTTPException(status_code=422, detail="`question` and `context` cannot be empty.")
+
+        # Load model and tokenizer
         if model_manager.pipeline is None:
             await model_manager.load_model()
 
+        model = model_manager.pipeline.model
         tokenizer = model_manager.pipeline.tokenizer
-        tokenized_inputs = tokenizer(sanitized_question, sanitized_context, truncation=True, max_length=512)
 
-        logger.info(f"Sanitized question: {sanitized_question}")
-        logger.info(f"Sanitized context: {sanitized_context}")
+        # Tokenize inputs
+        tokenized_inputs = tokenizer(
+            sanitized_question,
+            sanitized_context,
+            return_tensors="pt",
+            truncation=True,
+            max_length=512
+        )
 
-        logger.info(f"Tokenized context length: {len(tokenized_inputs['input_ids'])}")
-        logger.info(f"Tokenized inputs: {tokenized_inputs}")
+        # Force CPU usage
+        device = torch.device("cpu")
+        model.to(device)
+        tokenized_inputs = {key: val.to(device) for key, val in tokenized_inputs.items()}
 
-        # Validate inputs explicitly
-        if not sanitized_question:
-            raise HTTPException(status_code=422, detail="`question` cannot be empty.")
-        if not sanitized_context:
-            raise HTTPException(status_code=422, detail="`context` cannot be empty.")
+        # Run inference
+        outputs = model(**tokenized_inputs)
+        start_index = outputs.start_logits.argmax().item()
+        end_index = outputs.end_logits.argmax().item()
 
-        logger.info({
-            'action': 'faq_pipeline_called',
-            'question': sanitized_question,
-            'context_snippet': sanitized_context[:50] + '...' if len(sanitized_context) > 50 else sanitized_context
-        })
+        # Decode the predicted answer
+        predicted_answer = tokenizer.decode(
+            tokenized_inputs["input_ids"][0][start_index:end_index + 1]
+        )
+        logger.info(f"Predicted answer: {predicted_answer}")
 
-        # Keyword detection for branching
-        keywords = {
-            "experience": get_experience_response,
-            "skills": get_skills_response,
-            "education": get_education_response,
-            "projects": get_projects_response
-        }
+        # Return the result
+        return {"answer": predicted_answer}
 
-        # Check for keywords in the question and branch accordingly
-        for key, response_function in keywords.items():
-            if key in sanitized_question.lower():
-                return await response_function()
-
-        inputs = {"question": sanitized_question, "context": sanitized_context}
-
-        if model_manager.pipeline is None:
-            await model_manager.load_model()
-
-        # Run model inference
-        loop = asyncio.get_event_loop()
-        # result = await asyncio.to_thread(self.pipeline, inputs)
-        # result = await loop.run_in_executor(None, model_manager.pipeline, inputs)
-
-        result = await asyncio.to_thread(model_manager.pipeline, {"question": sanitized_question, "context": sanitized_context})
-        logger.info(f"Model result: {result}")
-
-        if "answer" not in result:
-            logger.error("Model did not return an answer.")
-            raise HTTPException(status_code=500, detail="Model failed to provide an answer.")
-
-        return {"answer": result["answer"]}
-
-    except HTTPException as http_exc:
-        raise http_exc
-    except ValidationError as val_err:
-        logger.error(f"Validation error: {val_err}")
-        raise HTTPException(status_code=422, detail=str(val_err))
     except Exception as e:
         logger.error(f"Unhandled error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="An internal error occurred.")
+        logger.error(f"Request details: question={faq_request.question}, context={faq_request.context}")
+        raise HTTPException(status_code=500, detail=f"An internal error occurred: {str(e)}")
 
-# Response functions for keyword-based branching
 async def get_experience_response():
     return {
         "answer": "I have over 5 years of experience in software development, focusing on artificial intelligence, "
@@ -205,12 +176,12 @@ async def health_check():
             }
 
 def get_device():
-    # Check for GPU (CUDA)
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    # Check for Metal (macOS GPU support)
-    elif torch.backends.mps.is_available():
-        return torch.device("mps")
-    # Default to CPU if no GPU is available
-    else:
-        return torch.device("cpu")
+    # # Check for GPU (CUDA)
+    # if torch.cuda.is_available():
+    #     return torch.device("cuda")
+    # # Check for Metal (macOS GPU support)
+    # elif torch.backends.mps.is_available():
+    #     return torch.device("mps")
+    # # Default to CPU if no GPU is available
+    # else:
+    return torch.device("cpu")
