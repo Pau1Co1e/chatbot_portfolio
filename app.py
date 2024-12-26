@@ -72,9 +72,9 @@ class ModelManager:
 model_manager = ModelManager()
 
 
-@app.on_event("startup")
-async def startup_event():
-    await model_manager.load_model()
+# @app.on_event("startup")
+# async def startup_event():
+#     await model_manager.load_model()
 
 # Pydantic Model for FAQ Request
 class FAQRequest(BaseModel):
@@ -91,15 +91,12 @@ def sanitize_text(text: str, max_length: int = 1000) -> str:
 @app.post("/faq/")
 async def call_faq_pipeline(faq_request: FAQRequest):
     try:
-        # Sanitize inputs
         sanitized_question = sanitize_text(faq_request.question, max_length=200)
         sanitized_context = sanitize_text(faq_request.context, max_length=1000)
 
-        # Validate inputs
-        if not sanitized_question or not sanitized_context:
-            raise HTTPException(status_code=422, detail="`question` and `context` cannot be empty.")
+        logger.info(f"Sanitized Question: {sanitized_question}")
+        logger.info(f"Sanitized Context: {sanitized_context}")
 
-        # Load model and tokenizer
         if model_manager.pipeline is None:
             await model_manager.load_model()
 
@@ -114,31 +111,25 @@ async def call_faq_pipeline(faq_request: FAQRequest):
             truncation=True,
             max_length=512
         )
-
-        # Force CPU usage
-        device = torch.device("cpu")
-        model.to(device)
-        tokenized_inputs = {key: val.to(device) for key, val in tokenized_inputs.items()}
+        logger.info(f"Tokenized Inputs: {tokenized_inputs}")
 
         # Run inference
         outputs = model(**tokenized_inputs)
         start_index = outputs.start_logits.argmax().item()
         end_index = outputs.end_logits.argmax().item()
+        logger.info(f"Start Index: {start_index}, End Index: {end_index}")
 
         # Decode the predicted answer
         predicted_answer = tokenizer.decode(
             tokenized_inputs["input_ids"][0][start_index:end_index + 1]
         )
-        logger.info(f"Predicted answer: {predicted_answer}")
+        logger.info(f"Predicted Answer: {predicted_answer}")
 
-        # Return the result
         return {"answer": predicted_answer}
-
     except Exception as e:
         logger.error(f"Unhandled error: {e}", exc_info=True)
-        logger.error(f"Request details: question={faq_request.question}, context={faq_request.context}")
-        raise HTTPException(status_code=500, detail=f"An internal error occurred: {str(e)}")
-
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
+    
 async def get_experience_response():
     return {
         "answer": "I have over 5 years of experience in software development, focusing on artificial intelligence, "
