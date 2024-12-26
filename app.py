@@ -108,6 +108,11 @@ async def call_faq_pipeline(faq_request: FAQRequest):
 
         tokenizer = model_manager.pipeline.tokenizer
         tokenized_inputs = tokenizer(sanitized_question, sanitized_context, truncation=True, max_length=512)
+
+        logger.info(f"Sanitized question: {sanitized_question}")
+        logger.info(f"Sanitized context: {sanitized_context}")
+
+        logger.info(f"Tokenized context length: {len(tokenized_inputs['input_ids'])}")
         logger.info(f"Tokenized inputs: {tokenized_inputs}")
 
         # Validate inputs explicitly
