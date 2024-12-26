@@ -51,7 +51,6 @@ class ModelManager:
                 try:
                     device = get_device()
                     model_path = "/opt/render/models/fine_tuned_albert"
-                    model_path = "/Users/paulcoleman/Documents/PersonalCode/chatbot_portfolio/models/fine_tuned_albert"
                     tokenizer = AlbertTokenizerFast.from_pretrained(model_path)  # Ensure tokenizer compatibility
                     model = AutoModelForQuestionAnswering.from_pretrained(model_path)
 
