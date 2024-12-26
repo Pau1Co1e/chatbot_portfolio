@@ -1,7 +1,7 @@
 from datasets import (
     Dataset,
     concatenate_datasets,
-    oad_dataset,
+    load_dataset,
     load_from_disk)
 from transformers import (
     AutoModelForQuestionAnswering,
