@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import torch
-from transformers import pipeline
+from transformers import pipeline, AutoTokenizer, AutoModelForQuestionAnswering
 import os
 import re
 import asyncio
@@ -50,7 +50,7 @@ class ModelManager:
             if self.pipeline is None:
                 try:
                     device = get_device()
-                    model_path = "/opt/render/models/fine_tuned_model"  # Updated path
+                    model_path = "/opt/render/models/fine_tuned_albert"  # Updated path
 
                     self.pipeline = pipeline(
                         "question-answering",
@@ -176,7 +176,7 @@ async def get_education_response():
 async def get_projects_response():
     return {
         "answer": "Some of my notable projects include a fractal dimension calculator, a stock market analysis predictor, "
-                  "and a chatbot application integrated into my personal portfolio website. These projects highlight my "
+                  "and an AI chatbot application integrated into my personal portfolio website. These projects highlight my "
                   "expertise in machine learning, mathematics, and practical AI applications."
     }
 
