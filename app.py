@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import torch
-from transformers import pipeline, AutoTokenizer, AutoModelForQuestionAnswering
+from transformers import pipeline, AutoTokenizer, AutoModelForQuestionAnswering, AlbertTokenizerFast
 import os
 import re
 import asyncio
@@ -50,33 +50,36 @@ class ModelManager:
             if self.pipeline is None:
                 try:
                     device = get_device()
-                    model_path = "/opt/render/models/fine_tuned_albert"  # Updated path
+                    model_path = "/opt/render/models/fine_tuned_albert"
+
+                    tokenizer = AlbertTokenizerFast.from_pretrained(model_path)  # Ensure tokenizer compatibility
+                    model = AutoModelForQuestionAnswering.from_pretrained(model_path)
 
                     self.pipeline = pipeline(
                         "question-answering",
-                        model=model_path,
-                        tokenizer=model_path,
+                        model=model,
+                        tokenizer=tokenizer,
                         device=0 if device.type != "cpu" else -1
                     )
-                    logger.info(f"Custom model loaded from {model_path} on {device}")
+                    logger.info(f"Custom model and tokenizer loaded from {model_path} on {device}")
                 except Exception as e:
-                    logger.error(f"Failed to load the custom model. Device: {device}. Path: {model_path}. Error: {e}")
+                    logger.error(f"Failed to load model or tokenizer. Error: {e}")
                     raise
 
 
 model_manager = ModelManager()
 
 
-# @app.on_event("startup")
-# async def startup_event():
-#     await model_manager.load_model()
-#
-#     # Redis setup for caching, ensuring it expects byte responses
-#     redis = Redis.from_url("redis://red-cror6njqf0us73eeqr0g:6379", decode_responses=False)
-#
-#     # Initialize FastAPI cache with Redis backend
-#     FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
-#
+@app.on_event("startup")
+async def startup_event():
+    await model_manager.load_model()
+
+    # # Redis setup for caching, ensuring it expects byte responses
+    # redis = Redis.from_url("redis://red-cror6njqf0us73eeqr0g:6379", decode_responses=False)
+    #
+    # # Initialize FastAPI cache with Redis backend
+    # FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
+
 
 # Pydantic Model for FAQ Request
 class FAQRequest(BaseModel):
@@ -99,6 +102,13 @@ async def call_faq_pipeline(faq_request: FAQRequest):
         # Sanitize inputs
         sanitized_question = sanitize_text(faq_request.question, max_length=200)
         sanitized_context = sanitize_text(faq_request.context, max_length=1000)
+
+        if model_manager.pipeline is None:
+            await model_manager.load_model()
+
+        tokenizer = model_manager.pipeline.tokenizer
+        tokenized_inputs = tokenizer(sanitized_question, sanitized_context, truncation=True, max_length=512)
+        logger.info(f"Tokenized inputs: {tokenized_inputs}")
 
         # Validate inputs explicitly
         if not sanitized_question:
@@ -133,7 +143,10 @@ async def call_faq_pipeline(faq_request: FAQRequest):
         # Run model inference
         loop = asyncio.get_event_loop()
         # result = await asyncio.to_thread(self.pipeline, inputs)
-        result = await loop.run_in_executor(None, model_manager.pipeline, inputs)
+        # result = await loop.run_in_executor(None, model_manager.pipeline, inputs)
+
+        result = await asyncio.to_thread(model_manager.pipeline, {"question": sanitized_question, "context": sanitized_context})
+        logger.info(f"Model result: {result}")
 
         if "answer" not in result:
             logger.error("Model did not return an answer.")
