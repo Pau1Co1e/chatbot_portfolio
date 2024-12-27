@@ -53,8 +53,8 @@ class ModelManager:
                     device = get_device()
                     model_path = "/opt/render/models/fine_tuned_albert"
 
-                    tokenizer = AlbertTokenizerFast.from_pretrained(model_path)  # Ensure tokenizer compatibility
-                    model = AlbertForQuestionAnswering.from_pretrained(model_path)
+                    tokenizer = AutoTokenizer.from_pretrained(model_path)  # Ensure tokenizer compatibility
+                    model = AutoModelForQuestionAnswering.from_pretrained(model_path)
 
                     self.pipeline = pipeline(
                         "question-answering",
