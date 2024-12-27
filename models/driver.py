@@ -1,9 +1,9 @@
 from transformers import (
-    AlbertTokenizerFast,
-    AlbertForQuestionAnswering,
     TrainingArguments,
     Trainer,
-    DataCollatorWithPadding
+    DataCollatorWithPadding, 
+    AutoTokenizer, 
+    AutoModelForQuestionAnswering
 )
 from datasets import load_dataset, load_from_disk
 from torch.utils.data import DataLoader
@@ -198,8 +198,8 @@ def pred_offset_to_text(start_idx, end_idx, input_ids, tokenizer):
 # Main training script
 def main():
     # 1. Initialize tokenizer/model
-    tokenizer = AlbertTokenizerFast.from_pretrained("albert-base-v2", truncation=True, max_length=512)
-    model = AlbertForQuestionAnswering.from_pretrained("albert-base-v2").to(device)
+    tokenizer = AutoTokenizer.from_pretrained("albert-base-v2", truncation=True, max_length=512)
+    model = AutoModelForQuestionAnswering.from_pretrained("albert-base-v2").to(device)
 
     # 2. Load or preprocess dataset (single pass)
     train_path = "C:/Users/Paul/PycharmProjects/chatbot_portfolio/data/final_cleaned_merged_dataset.json"
