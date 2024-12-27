@@ -2,7 +2,5 @@ services:
   - name: chatbot_portfolio
     type: web
     runtime: python
-    pythonVersion: 3.11.11
-    env: python
     buildCommand: pip install -r requirements.txt
     startCommand: python app.py
