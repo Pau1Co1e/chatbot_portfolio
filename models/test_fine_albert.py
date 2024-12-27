@@ -1,11 +1,11 @@
 import pytest
-from transformers import AlbertTokenizerFast, AlbertForQuestionAnswering
+from transformers import AutoModelForQuestionAnswering, AutoTokenizer
 import torch
 
 # Load the fine-tuned model and tokenizer
 model_path = "C:/Users/Paul/PycharmProjects/chatbot_portfolio/models/fine_tuned_albert"
-tokenizer = AlbertTokenizerFast.from_pretrained(model_path)
-model = AlbertForQuestionAnswering.from_pretrained(model_path)
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+model = AutoModelForQuestionAnswering.from_pretrained(model_path)
 
 device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 model.to(device)
