@@ -1,4 +1,4 @@
-from transformers import AlbertTokenizerFast, AlbertForQuestionAnswering, TrainingArguments, Trainer
+from transformers import AlbertTokenizerFast, AlbertForQuestionAnswering, TrainingArguments, Trainer, DataCollatorWithPadding
 from datasets import load_dataset
 import os
 import torch
@@ -49,6 +49,12 @@ def preprocess_for_albert(examples):
             else:
                 start_positions.append(0)
                 end_positions.append(0)
+            print(f"Question: {questions[i]}")
+            print(f"Context: {contexts[i]}")
+            print(f"Answer: {answer}")
+            print(f"Offsets: {offsets}")
+            print(f"Start: {start_char}, End: {end_char}")
+            print(f"Token Start Index: {token_start_index}, Token End Index: {token_end_index}")
 
     # Remove offset mapping for model input
     input_encodings.pop("offset_mapping")
@@ -66,33 +72,43 @@ train_dataset, validation_dataset = load_cleaned_datasets()
 tokenized_train = train_dataset.map(preprocess_for_albert, batched=True)
 tokenized_validation = validation_dataset.map(preprocess_for_albert, batched=True)
 
+fp16 = torch.cuda.is_available()
+
 # Define Training Arguments
 training_args = TrainingArguments(
     output_dir="./albert_results",
-    eval_strategy="epoch",  # Updated argument
-    evaluation_strategy="epoch",  # Keeping backward compatibility for older versions
-    learning_rate=1e-5,
-    per_device_train_batch_size=48,
-    gradient_accumulation_steps=16,  # Simulates batch size of 256
-    num_train_epochs=3,
-    weight_decay=0.01,
-    save_total_limit=2,
+    evaluation_strategy="steps",
+    eval_steps=500,
     save_steps=500,
-    fp16=True,  # Enable mixed precision
+    save_total_limit=2,
+    learning_rate=1e-5,
+    per_device_train_batch_size=16,
+    gradient_accumulation_steps=16,  # Simulates batch size of 256
+    num_train_epochs=5,
+    weight_decay=0.01,
+    fp16=fp16,
     max_grad_norm=1.0,
     logging_dir="./logs",
     no_cuda=not torch.cuda.is_available(),  # Automatically handle CUDA availability
 )
 
 # Define Trainer
+# trainer = Trainer(
+#     model=model,
+#     args=training_args,
+#     train_dataset=tokenized_train,
+#     eval_dataset=tokenized_validation,  # Added eval_dataset
+#     data_collator=lambda data: tokenizer.pad(data, return_tensors="pt"),
+# )
+
+data_collator = DataCollatorWithPadding(tokenizer=tokenizer, return_tensors="pt")
 trainer = Trainer(
     model=model,
     args=training_args,
     train_dataset=tokenized_train,
-    eval_dataset=tokenized_validation,  # Added eval_dataset
-    data_collator=lambda data: tokenizer.pad(data, return_tensors="pt"),
+    eval_dataset=tokenized_validation,
+    data_collator=data_collator,
 )
-
 # Train the model
 trainer.train()
 
