@@ -3,18 +3,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import torch
-from transformers import pipeline, AutoTokenizer, AutoModelForQuestionAnswering, AlbertTokenizerFast, \
-    AlbertForQuestionAnswering
+from transformers import pipeline, AutoTokenizer, AutoModelForQuestionAnswering
 import os
 import re
 import asyncio
-# from fastapi_cache2 import FastAPICache
-# from fastapi_cache2.backends.redis import RedisBackend
-# from fastapi_cache import FastAPICache
-# from fastapi_cache.backends.redis import RedisBackend
-# from redis.asyncio.client import Redis
-# from fastapi_cache.decorator import cache
-from pydantic import ValidationError
 
 # Environment Variables
 PORT = int(os.getenv("PORT", 8000))
@@ -53,7 +45,7 @@ class ModelManager:
                     device = get_device()
                     model_path = "/opt/render/models/fine_tuned_albert"
 
-                    tokenizer = AutoTokenizer.from_pretrained(model_path)  # Ensure tokenizer compatibility
+                    tokenizer = AutoTokenizer.from_pretrained(model_path)
                     model = AutoModelForQuestionAnswering.from_pretrained(model_path)
 
                     self.pipeline = pipeline(
@@ -65,7 +57,7 @@ class ModelManager:
                     logger.info(f"Custom model and tokenizer loaded from {model_path} on {device}")
                 except Exception as e:
                     logger.error(f"Failed to load model or tokenizer. Error: {e}")
-                    raise
+                    raise HTTPException(status_code=500, detail="Failed to load model.")
 
 
 model_manager = ModelManager()
@@ -74,12 +66,6 @@ model_manager = ModelManager()
 @app.on_event("startup")
 async def startup_event():
     await model_manager.load_model()
-
-    # # Redis setup for caching, ensuring it expects byte responses
-    # redis = Redis.from_url("redis://red-cror6njqf0us73eeqr0g:6379", decode_responses=False)
-    #
-    # # Initialize FastAPI cache with Redis backend
-    # FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
 
 
 # Pydantic Model for FAQ Request
@@ -91,27 +77,16 @@ class FAQRequest(BaseModel):
 # Helper function for sanitization
 def sanitize_text(text: str, max_length: int = 1000) -> str:
     sanitized = re.sub(r'\s+', ' ', text).strip()
-    if len(sanitized) > max_length:
-        sanitized = sanitized[:max_length]
-    return sanitized
+    return sanitized[:max_length]
 
 
 @app.post("/faq/")
-# @cache(expire=60)
 async def call_faq_pipeline(faq_request: FAQRequest):
     try:
         # Sanitize inputs
         sanitized_question = sanitize_text(faq_request.question, max_length=200)
         sanitized_context = sanitize_text(faq_request.context, max_length=1000)
 
-        if model_manager.pipeline is None:
-            await model_manager.load_model()
-
-        tokenizer = model_manager.pipeline.tokenizer
-        tokenized_inputs = tokenizer(sanitized_question, sanitized_context, truncation=True, max_length=512)
-        logger.info(f"Tokenized inputs: {tokenized_inputs}")
-
-        # Validate inputs explicitly
         if not sanitized_question:
             raise HTTPException(status_code=422, detail="`question` cannot be empty.")
         if not sanitized_context:
@@ -123,46 +98,36 @@ async def call_faq_pipeline(faq_request: FAQRequest):
             'context_snippet': sanitized_context[:50] + '...' if len(sanitized_context) > 50 else sanitized_context
         })
 
-        # Keyword detection for branching
+        # Branching logic based on keywords
         keywords = {
             "experience": get_experience_response,
             "skills": get_skills_response,
             "education": get_education_response,
             "projects": get_projects_response
         }
-
-        # Check for keywords in the question and branch accordingly
         for key, response_function in keywords.items():
             if key in sanitized_question.lower():
                 return await response_function()
-
-        inputs = {"question": sanitized_question, "context": sanitized_context}
 
         if model_manager.pipeline is None:
             await model_manager.load_model()
 
         # Run model inference
-        loop = asyncio.get_event_loop()
-        # result = await asyncio.to_thread(self.pipeline, inputs)
-        # result = await loop.run_in_executor(None, model_manager.pipeline, inputs)
-
-        result = await asyncio.to_thread(model_manager.pipeline, {"question": sanitized_question, "context": sanitized_context})
+        result = await asyncio.to_thread(
+            model_manager.pipeline,
+            {"question": sanitized_question, "context": sanitized_context}
+        )
         logger.info(f"Model result: {result}")
 
-        if "answer" not in result:
-            logger.error("Model did not return an answer.")
-            raise HTTPException(status_code=500, detail="Model failed to provide an answer.")
-
-        return {"answer": result["answer"]}
+        answer = result.get("answer", "No answer found.")
+        return {"answer": answer}
 
     except HTTPException as http_exc:
         raise http_exc
-    except ValidationError as val_err:
-        logger.error(f"Validation error: {val_err}")
-        raise HTTPException(status_code=422, detail=str(val_err))
     except Exception as e:
         logger.error(f"Unhandled error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An internal error occurred.")
+
 
 # Response functions for keyword-based branching
 async def get_experience_response():
@@ -173,12 +138,14 @@ async def get_experience_response():
                   "deepfake detection systems."
     }
 
+
 async def get_skills_response():
     return {
         "answer": "My core skills include Python programming, machine learning (using frameworks such as TensorFlow "
                   "and PyTorch), full-stack web development with technologies like Flask, ASP.NET, and SQLAlchemy, "
                   "and project development in AI, finance, and cybersecurity."
     }
+
 
 async def get_education_response():
     return {
@@ -187,6 +154,7 @@ async def get_education_response():
                   "Computer Science in 2022."
     }
 
+
 async def get_projects_response():
     return {
         "answer": "Some of my notable projects include a fractal dimension calculator, a stock market analysis predictor, "
@@ -194,20 +162,19 @@ async def get_projects_response():
                   "expertise in machine learning, mathematics, and practical AI applications."
     }
 
+
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy",
-            "model_loaded": model_manager.pipeline is not None
-            }
+    return {
+        "status": "healthy",
+        "model_loaded": model_manager.pipeline is not None
+    }
+
 
 def get_device():
-    # Check for GPU (CUDA)
     if torch.cuda.is_available():
         return torch.device("cuda")
-    # Check for Metal (macOS GPU support)
     elif torch.backends.mps.is_available():
         return torch.device("mps")
-    # Default to CPU if no GPU is available
     else:
         return torch.device("cpu")
-        
