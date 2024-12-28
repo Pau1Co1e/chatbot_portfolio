@@ -2,18 +2,26 @@ import logging
 import nltk
 import os
 import zipfile
-from nltk.data import find
+from nltk.data import find, FileSystemPathPointer
+
+# Add NLTK data path
+nltk.data.path.append('./nltk_data')
+
+# Patch nltk.data.find to handle the punkt_tab error
+def patched_find(resource_name, *args, **kwargs):
+    if resource_name == "tokenizers/punkt_tab/english":
+        # Redirect punkt_tab to the actual punkt/english.pickle file
+        punkt_path = "./nltk_data/tokenizers/punkt/english.pickle"
+        if os.path.exists(punkt_path):
+            return FileSystemPathPointer(punkt_path)
+        else:
+            raise LookupError(f"Punkt resource not found at: {punkt_path}")
+    return find(resource_name, *args, **kwargs)
+
+nltk.data.find = patched_find
 
 def initialize_nltk_resources():
     nltk.data.path.append('./nltk_data')
-
-    # Patch nltk.data.find
-    def patched_find(resource_name, *args, **kwargs):
-        if resource_name == "tokenizers/punkt_tab/english":
-            return find("tokenizers/punkt/english.pickle")
-        return find(resource_name, *args, **kwargs)
-
-    nltk.data.find = patched_find
 
     # Extract punkt.zip if necessary
     punkt_zip_path = './nltk_data/tokenizers/punkt.zip'
@@ -22,11 +30,23 @@ def initialize_nltk_resources():
         try:
             with zipfile.ZipFile(punkt_zip_path, 'r') as zip_ref:
                 zip_ref.extractall('./nltk_data/tokenizers')
+                logging.info("Extracted punkt.zip successfully.")
         except Exception as e:
-            raise Exception(f"Failed to extract punkt.zip: {e}")
+            logging.error(f"Failed to extract punkt.zip: {e}")
+            raise Exception("Failed to initialize NLTK punkt resources.")
+
+    # Verify punkt resource
+    if not os.path.exists(f"{punkt_dir_path}/english.pickle"):
+        logging.error("Expected punkt resource not found.")
+        raise Exception("Punkt resource is missing or incomplete.")
 
     # Download punkt if missing
-    nltk.download('punkt', download_dir='./nltk_data')
+    try:
+        nltk.download('punkt', download_dir='./nltk_data')
+        logging.info("NLTK punkt resource initialized successfully.")
+    except Exception as e:
+        logging.error(f"Failed to download NLTK punkt resource: {e}")
+        raise Exception("Failed to initialize NLTK resources.")
 
 initialize_nltk_resources()
 
