@@ -16,7 +16,7 @@ from transformers import (
 from sentence_transformers import SentenceTransformer, util
 from word2number import w2n
 # Explicitly add the NLTK data path
-nltk.data.path.append('/opt/render/nltk_data')
+nltk.data.path.append('./nltk_data')
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 
@@ -44,7 +44,11 @@ logging.basicConfig(
 logger = logging.getLogger("faq_pipeline")
 
 # Initialize stopwords
-stop_words = set(stopwords.words("english"))
+try:
+    stop_words = set(stopwords.words("english"))
+except LookupError:
+    logger.warning("NLTK stopwords not found. Using an empty set.")
+    stop_words = set()
 
 # Sentence-BERT Model for Semantic Similarity
 semantic_model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -62,6 +66,8 @@ class ModelManager:
                     device = get_device()
                     model_path = os.getenv("MODEL_PATH", "/opt/render/models/fine_tuned_albert")
 
+                    if not os.path.exists(model_path):
+                        raise ValueError(f"Model path does not exist: {model_path}")
                     logger.info(f"Loading model from: {model_path} on device: {device}")
 
                     tokenizer = AutoTokenizer.from_pretrained(model_path)
@@ -125,12 +131,12 @@ async def call_faq_pipeline(faq_request: FAQRequest):
         if not sanitized_context:
             raise HTTPException(status_code=422, detail="`context` cannot be empty.")
 
-        logger.info({
-            'action': 'faq_pipeline_called',
-            'question': sanitized_question,
-            'context_snippet': sanitized_context[:50] + '...' if len(sanitized_context) > 50 else sanitized_context
-        })
-
+        # logger.info({
+        #     'action': 'faq_pipeline_called',
+        #     'question': sanitized_question,
+        #     'context_snippet': sanitized_context[:50] + '...' if len(sanitized_context) > 50 else sanitized_context
+        # })
+    
         if model_manager.pipeline is None:
             await model_manager.load_model()
 
