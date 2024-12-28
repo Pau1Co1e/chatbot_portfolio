@@ -2,10 +2,18 @@ import logging
 import nltk
 import os
 import zipfile
-
+from nltk.data import find
 
 def initialize_nltk_resources():
     nltk.data.path.append('./nltk_data')
+
+    # Patch nltk.data.find
+    def patched_find(resource_name, *args, **kwargs):
+        if resource_name == "tokenizers/punkt_tab/english":
+            return find("tokenizers/punkt/english.pickle")
+        return find(resource_name, *args, **kwargs)
+
+    nltk.data.find = patched_find
 
     # Extract punkt.zip if necessary
     punkt_zip_path = './nltk_data/tokenizers/punkt.zip'
@@ -14,18 +22,11 @@ def initialize_nltk_resources():
         try:
             with zipfile.ZipFile(punkt_zip_path, 'r') as zip_ref:
                 zip_ref.extractall('./nltk_data/tokenizers')
-                logging.info("Extracted punkt.zip successfully.")
         except Exception as e:
-            logging.error(f"Failed to extract punkt.zip: {e}")
-            raise Exception("Failed to initialize NLTK punkt resources.")
+            raise Exception(f"Failed to extract punkt.zip: {e}")
 
     # Download punkt if missing
-    try:
-        nltk.download('punkt', download_dir='./nltk_data')
-    except Exception as e:
-        logging.error(f"Failed to download NLTK punkt resource: {e}")
-        raise Exception("Failed to initialize NLTK resources.")
-
+    nltk.download('punkt', download_dir='./nltk_data')
 
 initialize_nltk_resources()
 
