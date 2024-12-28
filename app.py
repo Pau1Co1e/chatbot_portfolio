@@ -1,8 +1,20 @@
 import logging
 import nltk
+import os
+
+# Initialize NLTK resources
+def initialize_nltk_resources():
+    nltk.data.path.append('./nltk_data')
+    try:
+        nltk.download('punkt', download_dir='./nltk_data')
+    except Exception as e:
+        logging.error(f"Failed to download NLTK punkt resource: {e}")
+        raise Exception("Failed to initialize NLTK resources.")
+
+initialize_nltk_resources()
+
 import torch
 import re
-import os
 import unicodedata
 import asyncio
 from fastapi import FastAPI, HTTPException
@@ -15,14 +27,15 @@ from transformers import (
 )
 from sentence_transformers import SentenceTransformer, util
 from word2number import w2n
-# Explicitly add the NLTK data path
-nltk.data.path.append('./nltk_data')
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 
 # Environment Variables
 PORT = int(os.getenv("PORT", 8000))
 FLASK_APP_ORIGIN = os.getenv("FLASK_APP_ORIGIN", "https://codebloodedfamily.com")
+
+if not FLASK_APP_ORIGIN:
+    logging.warning("FLASK_APP_ORIGIN is not set. Using default: https://codebloodedfamily.com")
 
 # Initialize FastAPI app
 app = FastAPI()
