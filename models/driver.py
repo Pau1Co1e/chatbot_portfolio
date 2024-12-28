@@ -1,8 +1,8 @@
 from transformers import (
     TrainingArguments,
     Trainer,
-    DataCollatorWithPadding, 
-    AutoTokenizer, 
+    DataCollatorWithPadding,
+    AutoTokenizer,
     AutoModelForQuestionAnswering
 )
 from datasets import load_dataset, load_from_disk
@@ -19,6 +19,7 @@ print(f"Using device: {device}")
 
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
+torch.backends.cudnn.benchmark = True
 
 def load_or_preprocess_dataset(train_path, valid_path, tokenizer, map_fn):
     train_out_dir = "./train_processed"
@@ -76,8 +77,7 @@ def preprocess_for_albert(examples, tokenizer):
         return_offsets_mapping=True
     )
 
-    start_positions = []
-    end_positions = []
+    start_positions, end_positions = [], []
 
     for i, answer in enumerate(answers):
         offsets = input_encodings["offset_mapping"][i]
@@ -97,8 +97,7 @@ def preprocess_for_albert(examples, tokenizer):
             end_positions.append(0)
             continue
 
-        token_start_index = None
-        token_end_index = None
+        token_start_index, token_end_index = None, None
 
         # Find the token index for the start_char
         for idx, (offset_start, offset_end) in enumerate(offsets):
@@ -198,8 +197,12 @@ def pred_offset_to_text(start_idx, end_idx, input_ids, tokenizer):
 # Main training script
 def main():
     # 1. Initialize tokenizer/model
-    tokenizer = AutoTokenizer.from_pretrained("albert-base-v2", truncation=True, max_length=512)
-    model = AutoModelForQuestionAnswering.from_pretrained("albert-base-v2").to(device)
+    # tokenizer = AutoTokenizer.from_pretrained("albert-base-v2", truncation=True, max_length=512)
+    # model = AutoModelForQuestionAnswering.from_pretrained("albert-base-v2").to(device)
+
+    tokenizer = AutoTokenizer.from_pretrained("albert-base-v2", use_fast=True)
+    model = AutoModelForQuestionAnswering.from_pretrained("albert-base-v2")
+    model.to(device)
 
     # 2. Load or preprocess dataset (single pass)
     train_path = "C:/Users/Paul/PycharmProjects/chatbot_portfolio/data/final_cleaned_merged_dataset.json"
@@ -212,7 +215,12 @@ def main():
         preprocess_for_albert
     )
 
-    # 3. Convert to torch format
+    # Remove 'id' if it's causing issues (same for 'title' or any extra columns not needed)
+    # After preprocessing, before DataLoader:
+    train_dataset = train_dataset.remove_columns(["id", "title", "context", "question", "answers"])
+    validation_dataset = validation_dataset.remove_columns(["id", "title", "context", "question", "answers"])
+
+
     train_dataset.set_format("torch")
     validation_dataset.set_format("torch")
 
@@ -222,20 +230,20 @@ def main():
     # 5. Create dataloaders
     train_dataloader = DataLoader(
         train_dataset,
-        batch_size=16,
+        batch_size=32,
         shuffle=True,
         collate_fn=data_collator,
-        num_workers=4,
+        num_workers=8,
         pin_memory=True,
         prefetch_factor=4
     )
 
     eval_dataloader = DataLoader(
         validation_dataset,
-        batch_size=16,
+        batch_size=32,
         shuffle=False,
         collate_fn=data_collator,
-        num_workers=4,
+        num_workers=8,
         pin_memory=True,
         prefetch_factor=4
     )
@@ -243,26 +251,30 @@ def main():
     # 6. Define training arguments
     training_args = TrainingArguments(
         output_dir="./albert_results",
-        eval_strategy="steps",
-        eval_steps=1000,
-        save_steps=500,
+        eval_strategy="epoch",
+        # eval_steps=2000,
+        # save_steps=500,
         save_total_limit=2,
-        learning_rate=1e-5,
-        per_device_train_batch_size=48,
+        learning_rate=5e-5,
+        per_device_train_batch_size=32,
         gradient_accumulation_steps=1,
-        num_train_epochs=5,
+        num_train_epochs=3,
         weight_decay=0.01,
-        fp16=torch.cuda.is_available(),
-        tf32=True,
+        bf16=torch.cuda.is_available(),
         max_grad_norm=1.0,
         logging_dir="./logs",
-        no_cuda=not torch.cuda.is_available(),
-        logging_steps=2000
+        # no_cuda=not torch.cuda.is_available(),
+        # logging_steps=2000,
+        optim="adamw_torch_fused",
+        remove_unused_columns=False
     )
 
     # # 7. Wrap compute_metrics
     # def wrapped_compute_metrics(pred):
     #     return compute_metrics(pred, eval_dataset=validation_dataset, tokenizer=tokenizer)
+
+    # Compile Model
+    model = torch.compile(model, backend="aot_eager")
 
     # 8. Initialize Trainer
     trainer = Trainer(
@@ -282,7 +294,7 @@ def main():
     tokenizer.save_pretrained("./fine_tuned_albert")
 
     # If you really want to store the final dataset, do it here
-    train_dataset.save_to_disk("/results/albert_train.cache", num_proc=8)
+    # train_dataset.save_to_disk("/results/albert_train.cache", num_proc=8)
 
     print(f"ALBERT model and tokenizer saved at: {os.path.abspath('./fine_tuned_albert')}")
 
