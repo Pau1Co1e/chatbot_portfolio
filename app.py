@@ -1,8 +1,13 @@
 import logging
+import nltk
+import torch
+import re
+import os
+import unicodedata
+import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-import torch
 from transformers import (
     pipeline,
     AutoTokenizer,
@@ -10,17 +15,10 @@ from transformers import (
 )
 from sentence_transformers import SentenceTransformer, util
 from word2number import w2n
-from nltk.corpus import stopwords
+# Explicitly add the NLTK data path
+nltk.data.path.append('/opt/render/nltk_data')
 from nltk.tokenize import word_tokenize
-import nltk
-import re
-import os
-import unicodedata
-import asyncio
-
-# Download required NLTK resources
-nltk.download('punkt')
-nltk.download('stopwords')
+from nltk.corpus import stopwords
 
 # Environment Variables
 PORT = int(os.getenv("PORT", 8000))
@@ -62,7 +60,9 @@ class ModelManager:
             if self.pipeline is None:
                 try:
                     device = get_device()
-                    model_path = "/opt/render/models/fine_tuned_albert"
+                    model_path = os.getenv("MODEL_PATH", "/opt/render/models/fine_tuned_albert")
+
+                    logger.info(f"Loading model from: {model_path} on device: {device}")
 
                     tokenizer = AutoTokenizer.from_pretrained(model_path)
                     model = AutoModelForQuestionAnswering.from_pretrained(model_path)
@@ -73,9 +73,9 @@ class ModelManager:
                         tokenizer=tokenizer,
                         device=0 if device.type != "cpu" else -1
                     )
-                    logger.info(f"Custom model and tokenizer loaded from {model_path} on {device}")
+                    logger.info("Model successfully loaded.")
                 except Exception as e:
-                    logger.error(f"Failed to load model or tokenizer. Error: {e}")
+                    logger.error(f"Failed to load model. Error: {e}")
                     raise HTTPException(status_code=500, detail="Failed to load model.")
 
 model_manager = ModelManager()
