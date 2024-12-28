@@ -136,7 +136,7 @@ async def call_faq_pipeline(faq_request: FAQRequest):
         #     'question': sanitized_question,
         #     'context_snippet': sanitized_context[:50] + '...' if len(sanitized_context) > 50 else sanitized_context
         # })
-    
+
         if model_manager.pipeline is None:
             await model_manager.load_model()
 
