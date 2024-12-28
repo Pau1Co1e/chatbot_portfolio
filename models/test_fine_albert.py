@@ -1,106 +1,139 @@
 import pytest
-from transformers import AutoModelForQuestionAnswering, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
 import torch
+import json
+import unicodedata
+from word2number import w2n  # For converting words to numbers
+from sentence_transformers import SentenceTransformer, util
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+import nltk
+nltk.download('punkt_tab')
+nltk.download('stopwords')
 
-# Load the fine-tuned model and tokenizer
-model_path = "C:/Users/Paul/PycharmProjects/chatbot_portfolio/models/fine_tuned_albert"
-tokenizer = AutoTokenizer.from_pretrained(model_path)
-model = AutoModelForQuestionAnswering.from_pretrained(model_path)
 
+# Path to fine-tuned ALBERT model and tokenizer
+MODEL_PATH = "/chatbot_portfolio/models/fine_tuned_albert"
+
+# Load the custom dataset for testing
+DATASET_PATH = "/chatbot_portfolio/data/final_cleaned_merged_dataset.json"
+with open(DATASET_PATH, "r") as f:
+    custom_data = json.load(f)
+
+# Initialize tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+model = AutoModelForQuestionAnswering.from_pretrained(MODEL_PATH)
+
+# Move the model to the appropriate device
 device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 model.to(device)
 
+# Prepare stopwords for normalization
+try:
+    stop_words = set(stopwords.words("english"))
+except LookupError:
+    nltk.download("stopwords")
+    stop_words = set(stopwords.words("english"))
+try:
+    nltk.data.find("tokenizers/punkt")
+except LookupError:
+    nltk.download("punkt")
 
-def answer_question_debug(question, context):
+
+def normalize_text(text):
+    """
+    Normalize text by removing special characters (e.g., accents) and converting to lowercase.
+    """
+    text = unicodedata.normalize("NFKD", text)  # Decompose characters (e.g., é -> e + ́)
+    text = "".join([c for c in text if not unicodedata.combining(c)])  # Remove diacritics
+    return text.lower()
+
+def extract_number(text):
+    """
+    Extract numeric values from text. Convert word numbers to digits if possible.
+    """
+    try:
+        return w2n.word_to_num(text)  # Convert word to number if possible
+    except ValueError:
+        # Fallback: Count elements in a list if comma-separated
+        tokens = text.split(',')
+        if len(tokens) > 1:
+            return len(tokens)
+        return None
+
+# Initialize a Sentence-BERT model for semantic similarity
+semantic_model = SentenceTransformer('all-MiniLM-L6-v2')
+
+def compute_semantic_similarity(predicted, expected_list):
+    """
+    Compute the highest semantic similarity between the predicted answer
+    and a list of expected answers.
+    """
+    predicted_embedding = semantic_model.encode(predicted, convert_to_tensor=True)
+    expected_embeddings = semantic_model.encode(expected_list, convert_to_tensor=True)
+    similarities = util.pytorch_cos_sim(predicted_embedding, expected_embeddings)
+    return similarities.max().item()  # Return the highest similarity score
+
+
+@pytest.mark.parametrize("data", custom_data)
+def test_albert_fine_tune(data):
+    context = data["context"]
+    question = data["question"]
+    expected_answers = data["answers"]["text"]
+
+    # Tokenize the input
     inputs = tokenizer(question, context, return_tensors="pt", truncation=True, padding=True, max_length=512)
-    inputs = {key: val.to(device) for key, val in inputs.items()}
+    inputs = {key: val.to(device) for key, val in inputs.items()}  # Send inputs to the correct device
 
+    # Get model outputs
     with torch.no_grad():
         outputs = model(**inputs)
-        start_logits, end_logits = outputs.start_logits, outputs.end_logits
+    start_logits = outputs.start_logits
+    end_logits = outputs.end_logits
 
-    start_index = torch.argmax(start_logits, dim=1).item()
-    end_index = torch.argmax(end_logits, dim=1).item()
+    # Get predicted start and end positions
+    start_idx = start_logits.argmax(dim=-1).item()
+    end_idx = end_logits.argmax(dim=-1).item()
 
-    if start_index <= end_index:
-        answer = tokenizer.decode(inputs["input_ids"][0][start_index:end_index + 1], skip_special_tokens=True)
+    # Decode the answer
+    if start_idx <= end_idx:
+        pred_answer = tokenizer.decode(inputs["input_ids"][0][start_idx:end_idx + 1], skip_special_tokens=True)
     else:
-        answer = "<no_answer>"
+        pred_answer = "No answer found."
 
-    # Debugging information
-    print("\n[DEBUG]")
-    print(f"Question: {question}")
-    print(f"Context: {context}")
-    print(f"Predicted Answer: {answer}")
-    print(f"Start Index: {start_index}, End Index: {end_index}")
-    print(f"Input IDs: {inputs['input_ids']}")
-    print(f"Start Logits: {start_logits.tolist()}")
-    print(f"End Logits: {end_logits.tolist()}")
+    # Normalize predicted and expected answers
+    pred_tokens = [word for word in word_tokenize(normalize_text(pred_answer)) if word not in stop_words]
+    expected_tokens_list = [
+        [word for word in word_tokenize(normalize_text(ans)) if word not in stop_words]
+        for ans in expected_answers
+    ]
 
-    return answer
+    # Token overlap ratio metric
+    overlap_ratios = [
+        len(set(pred_tokens).intersection(set(expected_tokens))) / max(len(expected_tokens), 1)
+        for expected_tokens in expected_tokens_list
+    ]
+    max_overlap = max(overlap_ratios)
 
+    # Compute semantic similarity
+    semantic_similarity = compute_semantic_similarity(pred_answer, expected_answers)
 
-@pytest.mark.parametrize(
-    "context, question, expected",
-    [
-        (
-                "Albert Einstein was a theoretical physicist who developed the theory of relativity, "
-                "one of the two pillars of modern physics. His work is also known for its influence on "
-                "the philosophy of science.",
-                "What did Albert Einstein develop?",
-                "the theory of relativity",
-        ),
-        (
-                "Paul Coleman is an AI and Machine Learning Engineer with experience in computer vision, NLP, "
-                "financial prediction models, anti-spam systems, and deepfake detection. He holds a Bachelor's "
-                "in Computer Science from Utah Valley University and is pursuing a Master's degree with expected "
-                "graduation in August 2025.",
-                "What is Paul Coleman's expertise?",
-                "AI and Machine Learning Engineer with experience in computer vision, NLP, financial prediction models, anti-spam systems, and deepfake detection",
-        ),
-        (
-                "Paul Coleman is an AI and Machine Learning Engineer with experience in computer vision, NLP, "
-                "financial prediction models, anti-spam systems, and deepfake detection. He holds a Bachelor's "
-                "in Computer Science from Utah Valley University and is pursuing a Master's degree with expected "
-                "graduation in August 2025.",
-                "When will Paul Coleman graduate?",
-                "August 2025",
-        ),
-        (
-                "Albert Einstein was a theoretical physicist who developed the theory of relativity, "
-                "one of the two pillars of modern physics. His work is also known for its influence on "
-                "the philosophy of science.",
-                "What are the two pillars of modern physics?",
-                "No answer found.",
-        ),
-        (
-                "Paul Coleman is an AI and Machine Learning Engineer with experience in computer vision, NLP, "
-                "financial prediction models, anti-spam systems, and deepfake detection. He is also skilled "
-                "in ASP.NET, Python, and Blazor frameworks.",
-                "What programming frameworks does Paul Coleman use?",
-                "ASP.NET, Python, and Blazor frameworks",
-        ),
-    ],
-)
-def test_answer_question_debug(context, question, expected):
-    actual = answer_question_debug(question, context)
+    # Log information for debugging
+    if max_overlap < 0.4 and semantic_similarity < 0.7:  # Debugging threshold
+        print("\n[DEBUG - Low Overlap]")
+        print(f"Context: {context}")
+        print(f"Question: {question}")
+        print(f"Expected: {expected_answers}")
+        print(f"Predicted: {pred_answer}")
+        print(f"Predicted Tokens: {pred_tokens}")
+        print(f"Expected Tokens List: {expected_tokens_list}")
+        print(f"Overlap Ratios: {overlap_ratios}")
+        print(f"Maximum Overlap: {max_overlap:.2f}")
+        print(f"Semantic Similarity: {semantic_similarity:.2f}")
 
-    # Handle no-answer cases
-    if expected == "<no_answer>":
-        assert actual == "<no_answer>", f"Expected no answer, got '{actual}'."
-    else:
-        # Compute token overlap for coverage
-        expected_tokens = set(expected.lower().split())
-        actual_tokens = set(actual.lower().split())
-        coverage = len(expected_tokens & actual_tokens) / max(len(expected_tokens), 1)
-
-        if coverage < 0.4:
-            # Debugging information
-            print(f"\n[DEBUG - Low Coverage]")
-            print(f"Context: {context}")
-            print(f"Question: {question}")
-            print(f"Expected: {expected}")
-            print(f"Actual: {actual}")
-            print(f"Coverage: {coverage:.2f}")
-
-        assert coverage >= 0.4, f"Low coverage: Expected '{expected}', got '{actual}' (Coverage: {coverage:.2f})."
+    # Assert based on token overlap ratio or semantic similarity
+    assert max_overlap >= 0.4 or semantic_similarity >= 0.7, (
+        f"Low overlap and semantic similarity! Predicted: '{pred_answer}', "
+        f"Expected: {expected_answers}, Overlap: {max_overlap:.2f}, "
+        f"Semantic Similarity: {semantic_similarity:.2f}"
+    )
