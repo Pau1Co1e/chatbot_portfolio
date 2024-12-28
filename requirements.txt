@@ -65,3 +65,8 @@ uvicorn==0.32.1
 xxhash==3.5.0
 yarl==1.18.3
 setuptools~=75.6.0
+sentence-transformers~=3.3.1
+word2number~=1.1
+scipy~=1.14.1
+scikit-learn~=1.6.0
+joblib~=1.4.2
