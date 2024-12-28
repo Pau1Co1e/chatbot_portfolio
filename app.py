@@ -1,15 +1,31 @@
 import logging
 import nltk
 import os
+import zipfile
 
-# Initialize NLTK resources
+
 def initialize_nltk_resources():
     nltk.data.path.append('./nltk_data')
+
+    # Extract punkt.zip if necessary
+    punkt_zip_path = './nltk_data/tokenizers/punkt.zip'
+    punkt_dir_path = './nltk_data/tokenizers/punkt'
+    if os.path.exists(punkt_zip_path) and not os.path.exists(punkt_dir_path):
+        try:
+            with zipfile.ZipFile(punkt_zip_path, 'r') as zip_ref:
+                zip_ref.extractall('./nltk_data/tokenizers')
+                logging.info("Extracted punkt.zip successfully.")
+        except Exception as e:
+            logging.error(f"Failed to extract punkt.zip: {e}")
+            raise Exception("Failed to initialize NLTK punkt resources.")
+
+    # Download punkt if missing
     try:
         nltk.download('punkt', download_dir='./nltk_data')
     except Exception as e:
         logging.error(f"Failed to download NLTK punkt resource: {e}")
         raise Exception("Failed to initialize NLTK resources.")
+
 
 initialize_nltk_resources()
 
