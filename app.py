@@ -3,10 +3,24 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import torch
-from transformers import pipeline, AutoTokenizer, AutoModelForQuestionAnswering
-import os
+from transformers import (
+    pipeline,
+    AutoTokenizer,
+    AutoModelForQuestionAnswering
+)
+from sentence_transformers import SentenceTransformer, util
+from word2number import w2n
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+import nltk
 import re
+import os
+import unicodedata
 import asyncio
+
+# Download required NLTK resources
+nltk.download('punkt')
+nltk.download('stopwords')
 
 # Environment Variables
 PORT = int(os.getenv("PORT", 8000))
@@ -31,6 +45,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger("faq_pipeline")
 
+# Initialize stopwords
+stop_words = set(stopwords.words("english"))
+
+# Sentence-BERT Model for Semantic Similarity
+semantic_model = SentenceTransformer('all-MiniLM-L6-v2')
 
 # Load the Model at Startup
 class ModelManager:
@@ -59,31 +78,45 @@ class ModelManager:
                     logger.error(f"Failed to load model or tokenizer. Error: {e}")
                     raise HTTPException(status_code=500, detail="Failed to load model.")
 
-
 model_manager = ModelManager()
-
 
 @app.on_event("startup")
 async def startup_event():
     await model_manager.load_model()
-
 
 # Pydantic Model for FAQ Request
 class FAQRequest(BaseModel):
     question: str = Field(..., max_length=200)
     context: str = Field(..., max_length=1000)
 
-
-# Helper function for sanitization
+# Helper Functions
 def sanitize_text(text: str, max_length: int = 1000) -> str:
     sanitized = re.sub(r'\s+', ' ', text).strip()
     return sanitized[:max_length]
 
+def normalize_text(text):
+    text = unicodedata.normalize("NFKD", text)  # Decompose characters (e.g., é -> e + ́)
+    text = "".join([c for c in text if not unicodedata.combining(c)])  # Remove diacritics
+    return text.lower()
+
+def extract_number(text):
+    try:
+        return w2n.word_to_num(text)
+    except ValueError:
+        tokens = text.split(',')
+        if len(tokens) > 1:
+            return len(tokens)
+        return None
+
+def compute_semantic_similarity(predicted, expected_list):
+    predicted_embedding = semantic_model.encode(predicted, convert_to_tensor=True)
+    expected_embeddings = semantic_model.encode(expected_list, convert_to_tensor=True)
+    similarities = util.pytorch_cos_sim(predicted_embedding, expected_embeddings)
+    return similarities.max().item()
 
 @app.post("/faq/")
 async def call_faq_pipeline(faq_request: FAQRequest):
     try:
-        # Sanitize inputs
         sanitized_question = sanitize_text(faq_request.question, max_length=200)
         sanitized_context = sanitize_text(faq_request.context, max_length=1000)
 
@@ -98,29 +131,44 @@ async def call_faq_pipeline(faq_request: FAQRequest):
             'context_snippet': sanitized_context[:50] + '...' if len(sanitized_context) > 50 else sanitized_context
         })
 
-        # Branching logic based on keywords
-        keywords = {
-            "experience": get_experience_response,
-            "skills": get_skills_response,
-            "education": get_education_response,
-            "projects": get_projects_response
-        }
-        for key, response_function in keywords.items():
-            if key in sanitized_question.lower():
-                return await response_function()
-
         if model_manager.pipeline is None:
             await model_manager.load_model()
 
-        # Run model inference
         result = await asyncio.to_thread(
             model_manager.pipeline,
             {"question": sanitized_question, "context": sanitized_context}
         )
         logger.info(f"Model result: {result}")
 
-        answer = result.get("answer", "No answer found.")
-        return {"answer": answer}
+        pred_answer = result.get("answer", "No answer found.")
+
+        # Post-process and compute semantic similarity
+        pred_tokens = [word for word in word_tokenize(normalize_text(pred_answer)) if word not in stop_words]
+        expected_answers = [faq_request.context]
+        expected_tokens_list = [
+            [word for word in word_tokenize(normalize_text(ans)) if word not in stop_words]
+            for ans in expected_answers
+        ]
+
+        overlap_ratios = [
+            len(set(pred_tokens).intersection(set(expected_tokens))) / max(len(expected_tokens), 1)
+            for expected_tokens in expected_tokens_list
+        ]
+        max_overlap = max(overlap_ratios)
+
+        semantic_similarity = compute_semantic_similarity(pred_answer, expected_answers)
+
+        logger.info({
+            'pred_answer': pred_answer,
+            'max_overlap': max_overlap,
+            'semantic_similarity': semantic_similarity
+        })
+
+        return {
+            "answer": pred_answer,
+            "max_overlap": max_overlap,
+            "semantic_similarity": semantic_similarity
+        }
 
     except HTTPException as http_exc:
         raise http_exc
@@ -128,48 +176,12 @@ async def call_faq_pipeline(faq_request: FAQRequest):
         logger.error(f"Unhandled error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An internal error occurred.")
 
-
-# Response functions for keyword-based branching
-async def get_experience_response():
-    return {
-        "answer": "I have over 5 years of experience in software development, focusing on artificial intelligence, "
-                  "machine learning, full-stack development, and robotics. I've worked extensively with frameworks like Flask, "
-                  "ASP.NET, and FastAPI, and contributed to projects ranging from financial prediction models to "
-                  "deepfake detection systems."
-    }
-
-
-async def get_skills_response():
-    return {
-        "answer": "My core skills include Python programming, machine learning (using frameworks such as TensorFlow "
-                  "and PyTorch), full-stack web development with technologies like Flask, ASP.NET, and SQLAlchemy, "
-                  "and project development in AI, finance, and cybersecurity."
-    }
-
-
-async def get_education_response():
-    return {
-        "answer": "I am currently pursuing my Master's degree in Computer Science at Utah Valley University, "
-                  "focusing on AI and machine learning for finance and cybersecurity. I graduated with a BSc in "
-                  "Computer Science in 2022."
-    }
-
-
-async def get_projects_response():
-    return {
-        "answer": "Some of my notable projects include a fractal dimension calculator, a stock market analysis predictor, "
-                  "and an AI chatbot application integrated into my personal portfolio website. These projects highlight my "
-                  "expertise in machine learning, mathematics, and practical AI applications."
-    }
-
-
 @app.get("/health")
 async def health_check():
     return {
         "status": "healthy",
         "model_loaded": model_manager.pipeline is not None
     }
-
 
 def get_device():
     if torch.cuda.is_available():
