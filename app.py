@@ -13,6 +13,7 @@ from transformers import (
 )
 from sentence_transformers import SentenceTransformer, util
 from word2number import w2n
+import torch
 
 # Environment Variables
 PORT = int(os.getenv("PORT", 8000))
