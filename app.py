@@ -14,6 +14,8 @@ from transformers import (
 from sentence_transformers import SentenceTransformer, util
 from word2number import w2n
 import torch
+from itertools import cycle
+
 
 # Environment Variables
 PORT = int(os.getenv("PORT", 8000))
@@ -21,6 +23,13 @@ FLASK_APP_ORIGIN = os.getenv("FLASK_APP_ORIGIN", "https://codebloodedfamily.com"
 
 if not FLASK_APP_ORIGIN:
     logging.warning("FLASK_APP_ORIGIN is not set. Using default: https://codebloodedfamily.com")
+    
+IDENTITY_QUESTIONS = [
+    "What is your name?",
+    "Who are you?",
+    "What's your name?",
+    "Tell me about yourself."
+]
 
 DEFAULT_CONTEXT = """
 Paul Coleman is working towards a Master of Science in Computer Science from Utah Valley University and is expected to graduate Fall 2025; He holds a Bachelor of Science in Computer Science and graduated August 2022 with a GPA of 3.26. 
@@ -68,6 +77,12 @@ stop_words = set(["the", "is", "in", "and", "to", "a", "of", "for", "on", "with"
 tokenizer = AutoTokenizer.from_pretrained("albert-base-v2", use_fast=True)
 semantic_model = SentenceTransformer('all-MiniLM-L6-v2')
 
+response_cycle = cycle([
+    "This is CodeBloodedBot you're speaking to, but the person who created me is named Paul Coleman.",
+    "I’m CodeBloodedBot, your friendly assistant! My creator is Paul Coleman, but I like to think I do all the heavy lifting!",
+    "I'm called CodeBloodedBot, and I'm an AI model built by Paul to answer questions you have about him.",
+    "CodeBloodedBot at your service! What questions do you have for me?",
+])
 
 # Load the Model at Startup
 class ModelManager:
@@ -139,6 +154,15 @@ async def call_faq_pipeline(faq_request: FAQRequest):
     try:
         # Sanitize the question
         sanitized_question = sanitize_text(faq_request.question, max_length=200)
+
+        # Handle identity-specific questions
+        if sanitized_question in IDENTITY_QUESTIONS:
+            response = next(response_cycle)
+            return {"answer": response}
+
+        if not DEFAULT_CONTEXT:
+            raise HTTPException(status_code=500, detail="Default context is missing.")
+            
         sanitized_context = sanitize_text(DEFAULT_CONTEXT, max_length=1000)
 
         if not sanitized_question:
