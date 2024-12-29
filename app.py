@@ -23,22 +23,23 @@ if not FLASK_APP_ORIGIN:
     logging.warning("FLASK_APP_ORIGIN is not set. Using default: https://codebloodedfamily.com")
 
 DEFAULT_CONTEXT = """
-Paul Coleman holds a Master of Science in Computer Science from Utah Valley University (expected August 2025) and a Bachelor of Science in Computer Science (graduated August 2022) with a GPA of 3.26. 
-Paul Coleman has a Programmer Certification from Utah Valley University (2020), was on the Dean's List in 2020 and 2021, and holds a CompTIA A+ Certification from Dell Inc. 
-Paul Coleman is skilled in AI & Machine Learning, model development, algorithm design, NLP, web development with Flask and JavaScript, and scalable systems design. 
-Paul is familiar with and has experience in all of the most popular programming languages. His expertise is with Python and C#. 
-Paul Coleman worked as a Full Stack Software Engineer at ResNexus from September 2023 to December 2023. He developed backend APIs and frontend components using the Microsoft tech stack for hotel and rental management products. 
+Paul Coleman is working towards a Master of Science in Computer Science from Utah Valley University and is expected to graduate Fall 2025; He holds a Bachelor of Science in Computer Science and graduated August 2022 with a GPA of 3.26. 
+Paul Coleman has a Programmer Certification from Utah Valley University that he earned in 2020, was on the Dean's List in 2020 and 2021, and held a CompTIA A+ Certification from Dell Inc. 
+Paul Coleman is skilled in AI & Machine Learning, model development, algorithm design, Natural Language Processing, web development with .NET, Flask and JavaScript, and scalable systems design. 
+Paul is familiar with and has experience in all of the most popular programming languages such as C#, Java, Javascript, and C++; however his expertise is with Python and C#. 
+Paul Coleman worked as a Full Stack Software Engineer at ResNexus from September 2023 to December 2023; He developed backend APIs and frontend components using the Microsoft tech stack for hotel and rental management products. 
 Paul Coleman organized a local donation event for the Northern Utah Habitat for Humanity Clothing Drive in June 2014, supporting children and families in the Dominican Republic. 
-Paul Coleman has experience with Interpretable Machine Learning techniques like LIME and SHAP. He has applied these methods to prediction models to explain outputs in an understandable way. 
-Paul has implemented Transfer Learning in NLP applications, utilizing pre-trained language models such as BERT for sentiment analysis and chatbots. He optimized transfer learning workflows for rapid deployment in AI systems. 
-Paul worked on Reinforcement Learning algorithms for autonomous mobile robots during his time at Utah Valley University. He focused on developing agents capable of decision-making in dynamic environments using Q-Learning and Deep Q-Networks. 
-Paul specializes in Natural Language Processing, having developed conversational AI systems using Transformer-based models like GPT. His projects include chatbots for customer support and advanced text summarization tools. 
-Paul implemented Anomaly Detection techniques in cybersecurity applications to identify fraud and unusual network behavior. He used autoencoders and statistical methods to improve system reliability. 
-Paul has applied Time Series Analysis in financial forecasting, developing models to predict stock price movements and economic trends. He has experience using ARIMA, LSTM networks, and seasonal decomposition techniques. 
-Paul has developed Computer Vision models for object detection and image segmentation. His projects include building a vision-based system for real time facial recognition and applying OpenCV and TensorFlow for object tracking. 
-Paul has worked extensively with convolutional neural networks (CNNs) for image analysis and recurrent neural networks (RNNs) for sequential data. His expertise includes designing custom architectures for real-world applications. 
-Paul led a project on Autonomous Mobile Robots at UVU, focusing on navigation and decision-making using reinforcement learning and sensor fusion techniques. He optimized the robots for interactive use at university recruitment events. 
-Paul developed a portfolio chatbot using a custom-trained ALBERT model integrated with Flask. He also worked on multi-turn dialogue systems for virtual assistants.
+Paul Coleman has experience with Interpretable Machine Learning techniques like LIME and SHAP; He has applied these methods to prediction models to explain outputs in an understandable way. 
+Paul has implemented Transfer Learning in NLP applications, utilizing pre-trained language models such as BERT and ALBERT for sentiment analysis and chatbots; He optimized transfer learning workflows for rapid deployment in AI systems. 
+Paul worked on Reinforcement Learning algorithms for autonomous mobile robots during his time at Utah Valley University; He focused on developing agents capable of decision-making in dynamic environments using Q-Learning and Deep Q-Networks. 
+Paul specializes in Natural Language Processing, having developed conversational AI systems using Transformer-based models like GPT; His projects include chatbots for customer support and advanced text summarization tools. 
+Paul implemented Anomaly Detection techniques in cybersecurity applications to identify fraud and unusual network behavior; He used autoencoders and statistical methods to improve system reliability. 
+Paul has applied Time Series Analysis in financial forecasting, developing models to predict stock price movements and economic trends; He has experience using ARIMA, LSTM networks, and seasonal decomposition techniques. 
+Paul has developed Computer Vision models for object detection and image segmentation; His projects include building a vision-based system for real time facial recognition and applying OpenCV and TensorFlow for object tracking. 
+Paul has worked extensively with convolutional neural networks (CNNs) for image analysis and recurrent neural networks (RNNs) for sequential data; His expertise includes designing custom architectures for real-world applications. 
+Paul led a project on humanoid Autonomous Mobile Robots at UVU, focusing on navigation, coordination and decision-making using reinforcement learning and sensor fusion techniques; He optimized the robots for interactive use at university recruitment events. 
+Paul developed a portfolio chatbot using a fine tuned custom-trained ALBERT model integrated with Flask; He also worked on multi-turn dialogue systems for virtual assistants.
+Whenever Paul has spare time, he loves to spend it with his twins and family; Paul also enjoys biking, video games, guitar, and staying current with novel innovations and technologies.
 """
 
 # Initialize FastAPI app
